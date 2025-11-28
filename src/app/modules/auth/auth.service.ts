@@ -8,10 +8,111 @@ import {
   createAccessTokenWithRefreshToken,
   createUserToken,
 } from "../../utils/userToken";
-import { IUser, UserStatus } from "../user/user.interface";
+import { IUser, UserRole, UserStatus } from "../user/user.interface";
 import { User } from "../user/user.model";
+import mongoose from "mongoose";
+
+
+const isProd = envVars.NODE_ENV === "production";
 
 export const AuthServices = {
+  createUser: async (payload: Partial<IUser>) => {
+    const session = await mongoose.startSession();
+
+    try {
+      session.startTransaction();
+
+      const isUserExist = await User.findOne({ email: payload.email });
+      if (isUserExist) {
+        throw new AppError(
+          StatusCodes.CONFLICT,
+          "User already exists with this email"
+        );
+      }
+
+      const userData: Partial<IUser> = {
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+        role: UserRole.USER,
+        status: UserStatus.PENDING,
+        providers: [
+          {
+            provider: "credentials",
+            providerId: payload.email as string,
+          },
+        ],
+      };
+
+      const newUser = await User.create([userData], { session });
+
+      if (!newUser.length) {
+        throw new AppError(StatusCodes.BAD_REQUEST, "Failed to create user");
+      }
+
+      const createdUser = newUser[0];
+
+      // Token Generation
+      const verificationToken = jwt.sign(
+        { email: createdUser.email, id: createdUser._id },
+        envVars.JWT.JWT_ACCESS_SECRET as string,
+        { expiresIn: "10m" }
+      );
+
+      const verificationLink = `${
+        isProd ? envVars.FRONTEND_URL : envVars.LOCAL_FRONTEND_URL
+      }/verify-email?token=${verificationToken}`;
+
+      // Email Send
+      await sendEmail({
+        to: createdUser.email,
+        subject: "Welcome to TicketFlow - Verify your email",
+        templateName: "emailVerification",
+        templateData: {
+          name: createdUser.name,
+          verificationLink,
+        },
+      });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      const result = createdUser.toObject();
+      delete result.password;
+
+      return result;
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
+  },
+
+  verifyUser: async (token: string) => {
+    if (!token) {
+      throw new AppError(StatusCodes.BAD_REQUEST, "Verification token missing");
+    }
+
+    const decoded = jwt.verify(
+      token,
+      envVars.JWT.JWT_ACCESS_SECRET as string
+    ) as JwtPayload;
+
+    const user = await User.findOne({ email: decoded.email });
+    if (!user) {
+      throw new AppError(StatusCodes.NOT_FOUND, "User not found");
+    }
+
+    if (user.status === UserStatus.ACTIVE) {
+      return "Email is already verified";
+    }
+
+    user.status = UserStatus.ACTIVE;
+    await user.save();
+
+    return "Email verified successfully!";
+  },
+
   credentialsLogin: async (payload: Partial<IUser>) => {
     const { email, password } = payload;
 
@@ -62,7 +163,6 @@ export const AuthServices = {
     };
   },
 
-  // This function handles changing the user's password.
   changePassword: async (
     userId: string,
     oldPassword: string,
@@ -107,7 +207,6 @@ export const AuthServices = {
     return true;
   },
 
-  // This function handles setting a new password for the user.
   setPassword: async (userId: string, planPassword: string) => {
     const isUserExist = await User.findById(userId);
 
@@ -135,7 +234,6 @@ export const AuthServices = {
     return true;
   },
 
-  // This function handles the forgot password process.
   forgotPassword: async (email: string) => {
     const isUserExist = await User.findOne({ email });
 
@@ -190,7 +288,6 @@ export const AuthServices = {
     await isUserExist.save();
   },
 
-  // This function handles resetting the user's password.
   resetPassword: async (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     payload: Record<string, any>,

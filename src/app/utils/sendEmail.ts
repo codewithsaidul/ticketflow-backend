@@ -1,10 +1,12 @@
+/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { envVars } from "../config/env";
 import path from "path";
 import ejs from "ejs";
 import { AppError } from "../errorHelpers/AppError";
 
+// আপনার ইন্টারফেস হুবহু সেইম আছে
 interface SendEmailOption {
   to: string;
   subject: string;
@@ -17,18 +19,8 @@ interface SendEmailOption {
   }[];
 }
 
-const transport = nodemailer.createTransport({
-  secure: true,
-  auth: {
-    user: envVars.EMAIL_SENDER.SMTP_USER,
-    pass: envVars.EMAIL_SENDER.SMTP_PASS,
-  },
-  port: Number(envVars.EMAIL_SENDER.SMTP_PORT),
-  host: envVars.EMAIL_SENDER.SMTP_HOST,
-  tls: {
-    rejectUnauthorized: false, // <--- এই লাইনটি যোগ করুন
-  },
-});
+// Transport এর বদলে Resend Instance
+const resend = new Resend(envVars.EMAIL_SENDER.RESEND_API_KEY); // .env ফাইলে API Key রাখবেন
 
 export const sendEmail = async ({
   to,
@@ -39,20 +31,29 @@ export const sendEmail = async ({
 }: SendEmailOption) => {
   try {
     const templatePath = path.join(__dirname, `templates/${templateName}.ejs`);
+    
+    // আপনার কাস্টম EJS ডিজাইন জেনারেট হচ্ছে
     const html = await ejs.renderFile(templatePath, templateData);
-    await transport.sendMail({
-      from: envVars.EMAIL_SENDER.SMTP_FROM,
+
+    // Nodemailer এর sendMail এর বদলে Resend এর send
+    const { data, error } = await resend.emails.send({
+      from: "TicketFlow Support <onboarding@resend.dev>",
       to: to,
       subject: subject,
-      html: html,
+      html: html, // 🔥 আপনার কাস্টম HTML ডিজাইন হুবহু যাবে
       attachments: attachments?.map((attachment) => ({
-        fileName: attachment.filename,
+        filename: attachment.filename,
         content: attachment.content,
-        contentType: attachment.contentType,
       })),
     });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    console.log("✅ Email sent successfully:", data);
   } catch (err: any) {
-    console.log(err);
+    console.log("❌ Email Error:", err);
     throw new AppError(401, "Email Sending Failed", err);
   }
 };

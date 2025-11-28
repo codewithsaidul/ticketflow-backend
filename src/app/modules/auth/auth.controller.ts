@@ -10,10 +10,41 @@ import { sendResponse } from "../../utils/sendResponse";
 import { setAuthCookie } from "../../utils/setCookie";
 import { createUserToken } from "../../utils/userToken";
 import { AuthServices } from "./auth.service";
-
-
+import { IUser } from "../user/user.interface";
 
 export const AuthController = {
+  createUser: catchAsync(async (req: TRequest, res: TResponse, next: TNext) => {
+    const payload: IUser = {
+      ...req.body,
+      profileImg: req?.file?.path,
+    };
+    const user = await AuthServices.createUser(payload);
+
+    sendResponse(res, {
+      statusCode: StatusCodes.CREATED,
+      success: true,
+      message: `A verification email has been sent to your email. Please check your inbox to verify your account.`,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImg: user.profileImg,
+        role: user.role,
+      },
+    });
+  }),
+
+  verifyUser: catchAsync(async (req: TRequest, res: TResponse, next: TNext) => {
+    const message = await AuthServices.verifyUser(req.query.token as string);
+
+    sendResponse(res, {
+      statusCode: StatusCodes.OK,
+      success: true,
+      message: message,
+      data: null,
+    });
+  }),
+
   credentialsLogin: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
       passport.authenticate(

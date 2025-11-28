@@ -2,7 +2,6 @@ import { Router } from "express";
 import { checkAuth } from "../../middleware/checkAuth";
 import { validateRequest } from "../../middleware/validateRequest";
 import { AuthController } from "./auth.controller";
-
 import passport from "passport";
 import { TNext, TRequest, TResponse } from "../../types/global";
 import { envVars } from "../../config/env";
@@ -11,9 +10,18 @@ import {
   setPasswordZodSchema,
 } from "./auth.validation";
 import { UserRole } from "../user/user.interface";
+import { createUserZodSchema } from "../user/user.validation";
+import { multerUpload } from "../../config/multer.config";
 
 const router = Router();
 
+router.post(
+  "/register",
+  multerUpload.single("file"),
+  validateRequest(createUserZodSchema),
+  AuthController.createUser
+);
+router.get("/verify-email", AuthController.verifyUser);
 router.post("/login", AuthController.credentialsLogin);
 router.post("/refresh-token", AuthController.getNewAccessToken);
 router.post("/logout", AuthController.logout);
@@ -29,10 +37,7 @@ router.post(
   validateRequest(setPasswordZodSchema),
   AuthController.setPassword
 );
-router.post(
-  "/reset-password",
-  AuthController.resetPassword
-);
+router.post("/reset-password", AuthController.resetPassword);
 router.post("/forgot-password", AuthController.forgotPassword);
 
 router.get("/google", async (req: TRequest, res: TResponse, next: TNext) => {

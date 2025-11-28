@@ -5,7 +5,7 @@ import { User } from "../modules/user/user.model";
 import { IAuthProvider, IUser, UserRole, UserStatus } from "../modules/user/user.interface";
 
 
-export const seedAdmin = async () => {
+export const seedSuperAdmin = async () => {
   try {
     const isSuperAdminExist = await User.findOne({ role: UserRole.SUPERADMIN });
 
