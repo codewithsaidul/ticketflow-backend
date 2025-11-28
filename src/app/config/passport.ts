@@ -7,10 +7,10 @@ import {
   VerifyCallback,
 } from "passport-google-oauth20";
 import { Strategy as LocalStrategy } from "passport-local";
-import { IsActive, Role } from "../Modules/user/user.interface";
-import { User } from "../Modules/user/user.model";
 import { envVars } from "./env";
-import { Driver } from "../Modules/driver/driver.model";
+import { User } from "../modules/user/user.model";
+import { UserRole, UserStatus } from "../modules/user/user.interface";
+
 // import { envVars } from "./env";
 
 // This configures Passport.js for user authentication using the Local Strategy.
@@ -29,42 +29,27 @@ passport.use(
         }
 
         // check if user verified or unVerified
-        if (!isUserExist.isVerified) {
+        if (isUserExist.status === UserStatus.PENDING) {
           return done(null, false, {
             message: "You're not verified yet, please verify your email first",
           });
         }
 
         // check if user is InActive or Blocked
-        if (
-          isUserExist.isActive === IsActive.INACTIVE ||
-          isUserExist.isActive === IsActive.BLOCKED
-        ) {
+        if (isUserExist.status === UserStatus.BLOCKED) {
           return done(null, false, {
-            message: `User is ${isUserExist.isActive}, please contact our support team.`,
+            message: `Your account is blocked, please contact our support team.`,
           });
         }
 
-        if (isUserExist.role === Role.DRIVER) {
-          const isDriverExist = await Driver.findOne({
-            driver: isUserExist._id,
-          });
 
-          if (!isDriverExist) {
-            return done(null, false, { message: "Driver not found"})
-          }
-
-          if (isDriverExist.driverStatus === "suspend") {
-            return done(null, false, { message: "You are suspend. Please contact with our support team"})
-          }
-        }
 
         // check if user is deleted
         if (isUserExist.isDeleted) {
           return done(null, false, { message: "User is deleted." });
         }
 
-        const isGoogleAuthenticatior = isUserExist?.auths?.some(
+        const isGoogleAuthenticatior = isUserExist?.providers?.some(
           (providerObject) => providerObject.provider === "google"
         );
 
@@ -114,20 +99,17 @@ passport.use(
 
         let isUserExist = await User.findOne({ email });
 
-        if (isUserExist && !isUserExist.isVerified) {
+        if (isUserExist && isUserExist.status === UserStatus.PENDING) {
           return done(null, false, {
             message: "You're not verified. please verify your email first",
           });
         }
 
         // check if user is InActive or Blocked
-        if (
-          isUserExist &&
-          (isUserExist.isActive === IsActive.INACTIVE ||
-            isUserExist.isActive === IsActive.BLOCKED)
-        ) {
+        // check if user is InActive or Blocked
+        if (isUserExist && isUserExist.status === UserStatus.BLOCKED) {
           return done(null, false, {
-            message: `User is ${isUserExist.isActive}, please contact our support team.`,
+            message: `Your account is blocked, please contact our support team.`,
           });
         }
 
@@ -141,11 +123,11 @@ passport.use(
             name: profile.displayName || "Google User",
             email,
             profilePicture: profile?.photos?.[0]?.value,
-            role: Role.RIDER,
-            isActive: IsActive.ACTIVE,
+            role: UserRole.USER,
+            status: UserStatus.ACTIVE,
             isVerified: true,
             isDeleted: false,
-            auths: [
+            providers: [
               {
                 provider: "google",
                 providerId: profile.emails?.[0]?.value,

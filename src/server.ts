@@ -4,8 +4,8 @@ import mongoose from "mongoose";
 import { Server as SocketIoServer } from "socket.io";
 import app from "./app";
 import { envVars } from "./app/config/env";
-import { connectRedis } from "./app/config/redis.config";
-import { seedAdmin } from "./app/utils/seedAdmin";
+import { seedSuperAdmin } from "./app/utils/seedSuperAdmin";
+
 
 let server: http.Server;
 export let io: SocketIoServer;
@@ -13,20 +13,16 @@ const port = envVars.PORT;
 
 const startServer = async () => {
   try {
-    // 1. Connect Databases
-    await mongoose.connect(`${envVars.DB_URL}`);
+    await mongoose.connect(`${envVars.DATABASE_URL}`);
     console.log("✅ MongoDB Connected Successfully");
 
-    await connectRedis();
-    console.log("✅ Redis Connected Successfully");
+    // await connectRedis();
+    // console.log("✅ Redis Connected Successfully");
 
-    // 2. Seed Admin (Optional check)
-    await seedAdmin();
+    await seedSuperAdmin();
 
-    // 3. Create Server
     server = http.createServer(app);
 
-    // 4. Setup Socket.io
     io = new SocketIoServer(server, {
       cors: {
         origin: [envVars.FRONTEND_URL, envVars.LOCAL_FRONTEND_URL],
@@ -36,11 +32,9 @@ const startServer = async () => {
       },
     });
 
-    // 5. Socket Logic
     io.on("connection", (socket) => {
       console.log(`🔌 User connected: ${socket.id}`);
 
-      // Join specific rooms (For Seat Locking Updates)
       socket.on("join_ticket_room", (ticketId) => {
         socket.join(ticketId);
         console.log(`User ${socket.id} joined room: ${ticketId}`);
@@ -51,7 +45,6 @@ const startServer = async () => {
       });
     });
 
-    // 6. Start Listening
     server.listen(port, () => {
       console.log(
         `🚀 Biggest Ever Ticketing System - TicketFlow Server running on port ${port}`
@@ -63,10 +56,8 @@ const startServer = async () => {
   }
 };
 
-// Start the server
 startServer();
 
-// --- Graceful Shutdown Logic (DRY Pattern) ---
 
 const gracefulShutdown = (signal: string) => {
   console.log(`\n${signal} received. Shutting down gracefully...`);

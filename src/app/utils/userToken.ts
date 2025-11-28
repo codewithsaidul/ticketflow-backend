@@ -1,14 +1,13 @@
 import { StatusCodes } from "http-status-codes";
 import { envVars } from "../config/env";
 import { AppError } from "../errorHelpers/AppError";
-import { IsActive, IUser } from "../Modules/user/user.interface";
 import { generateToken } from "./jwt";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { User } from "../Modules/user/user.model";
+import { IUser, UserStatus } from "../modules/user/user.interface";
+import { User } from "../modules/user/user.model";
 
-// This function creates a user token containing access and refresh tokens.
-// It takes a user object as input, extracts necessary information, and generates tokens using the provided secret and expiration time from environment variables.
-// The generated tokens are returned in an object.
+
+
 export const createUserToken = (user: Partial<IUser>) => {
   const jwtPayload = {
     userId: user._id,
@@ -36,9 +35,7 @@ export const createUserToken = (user: Partial<IUser>) => {
   };
 };
 
-// This function creates a new access token using the provided refresh token.
-// It verifies the refresh token, checks if the user exists, and ensures the user's status is active and not deleted.
-// If any checks fail, it throws an appropriate AppError.
+
 export const createAccessTokenWithRefreshToken = async (
   refreshToken: string
 ) => {
@@ -56,13 +53,10 @@ export const createAccessTokenWithRefreshToken = async (
   }
 
   // check if user is InActive or Blocked
-  if (
-    isUserExist.isActive === IsActive.INACTIVE ||
-    isUserExist.isActive === IsActive.BLOCKED
-  ) {
+  if (isUserExist.status === UserStatus.BLOCKED) {
     throw new AppError(
       StatusCodes.FORBIDDEN,
-      `User is ${isUserExist.isActive}, please contact our support team.`
+      `User is ${isUserExist.status}, please contact our support team.`
     );
   }
 

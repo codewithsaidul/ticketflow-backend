@@ -2,11 +2,11 @@ import { StatusCodes } from "http-status-codes";
 import { JwtPayload } from "jsonwebtoken";
 import { envVars } from "../config/env";
 import { AppError } from "../errorHelpers/AppError";
-import { IsActive, Role } from "../Modules/user/user.interface";
-import { User } from "../Modules/user/user.model";
 import { TNext, TRequest, TResponse } from "../types/global";
 import { verifyToken } from "./../utils/jwt";
-import { Driver } from "../Modules/driver/driver.model";
+import { User } from "../modules/user/user.model";
+import { UserStatus } from "../modules/user/user.interface";
+
 
 export const checkAuth =
   (...authRoles: string[]) =>
@@ -47,33 +47,19 @@ export const checkAuth =
     }
 
     // check if user verified or unVerified
-    if (!isUserExist.isVerified) {
+    if (isUserExist.status === UserStatus.PENDING) {
       throw new AppError(
         StatusCodes.BAD_REQUEST,
         "You're not verified yet, please verify your email first"
       );
     }
 
-    if (isUserExist.role === Role.DRIVER) {
-      const isDriverExist = await Driver.findOne( { driver: isUserExist._id } );
-
-      if (!isDriverExist) {
-        throw new AppError(StatusCodes.NOT_FOUND, "Driver not found");
-      }
-
-      if (isDriverExist.driverStatus === "suspend") {
-        throw new AppError(StatusCodes.BAD_REQUEST, "You are suspend. Please contact with our support team");
-      }
-    }
 
     // check if user is InActive or Blocked
-    if (
-      isUserExist.isActive === IsActive.INACTIVE ||
-      isUserExist.isActive === IsActive.BLOCKED
-    ) {
+    if (isUserExist.status === UserStatus.BLOCKED) {
       throw new AppError(
         StatusCodes.FORBIDDEN,
-        `User is ${isUserExist.isActive}, please contact our support team.`
+        `User is ${isUserExist.status}, please contact our support team.`
       );
     }
 
