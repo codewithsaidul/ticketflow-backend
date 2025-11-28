@@ -1,6 +1,10 @@
 import { Model } from "mongoose";
 
-export type TEventMode = "ASSIGNED" | "OPEN" | "STANDING";
+export enum EventMode {
+  ASSIGNED = "ASSIGNED", // e.g., Cinema, Theater
+  OPEN = "OPEN",         // e.g., Concert with Zones
+  STANDING = "STANDING"  // e.g., Seminar with General Admission
+}
 
 export interface ISeatLayout {
   rows: number;
@@ -22,7 +26,7 @@ export interface IEvent {
   date: Date;
   location: string;
   banner?: string;
-  mode: TEventMode;
+  mode: EventMode;
 
   // Conditional Fields
   seatLayout?: ISeatLayout; // Only for ASSIGNED

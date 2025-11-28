@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { EventModel, IEvent } from './events.interface';
+import { EventMode, EventModel, IEvent } from './events.interface';
 
 const eventSchema = new Schema<IEvent, EventModel>({
   title: { type: String, required: true },
@@ -10,7 +10,8 @@ const eventSchema = new Schema<IEvent, EventModel>({
   
   mode: { 
     type: String, 
-    enum: ['ASSIGNED', 'OPEN', 'STANDING'], 
+    enum: [...Object.values(EventMode)],
+    default: EventMode.OPEN,
     required: true 
   },
 
