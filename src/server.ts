@@ -1,11 +1,11 @@
 /* eslint-disable no-console */
 import http from "http";
 import mongoose from "mongoose";
-import { envVars } from "./app/config/env";
-import app from "./app";
-import { seedAdmin } from "./app/utils/seedAdmin";
-import { connectRedis } from "./app/config/redis.config";
 import { Server as SocketIoServer } from "socket.io";
+import app from "./app";
+import { envVars } from "./app/config/env";
+import { connectRedis } from "./app/config/redis.config";
+import { seedAdmin } from "./app/utils/seedAdmin";
 
 let server: http.Server;
 export let io: SocketIoServer;
@@ -13,86 +13,102 @@ const port = envVars.PORT;
 
 const startServer = async () => {
   try {
+    // 1. Connect Databases
     await mongoose.connect(`${envVars.DB_URL}`);
+    console.log("✅ MongoDB Connected Successfully");
 
+    await connectRedis();
+    console.log("✅ Redis Connected Successfully");
+
+    // 2. Seed Admin (Optional check)
+    await seedAdmin();
+
+    // 3. Create Server
     server = http.createServer(app);
 
+    // 4. Setup Socket.io
     io = new SocketIoServer(server, {
       cors: {
         origin: [envVars.FRONTEND_URL, envVars.LOCAL_FRONTEND_URL],
-        methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
+        methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+        allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true,
       },
     });
 
+    // 5. Socket Logic
     io.on("connection", (socket) => {
+      console.log(`🔌 User connected: ${socket.id}`);
 
-      socket.on("join_ride_room", (rideId) => {
-        socket.join(rideId);
+      // Join specific rooms (For Seat Locking Updates)
+      socket.on("join_ticket_room", (ticketId) => {
+        socket.join(ticketId);
+        console.log(`User ${socket.id} joined room: ${ticketId}`);
       });
 
       socket.on("disconnect", () => {
-        console.log(`🔌 User disconnected: ${socket.id}`);
+        console.log(`❌ User disconnected: ${socket.id}`);
       });
     });
 
+    // 6. Start Listening
     server.listen(port, () => {
-      console.log(`Ride Booking Server running on port ${port}`);
+      console.log(
+        `🚀 Biggest Ever Ticketing System - TicketFlow Server running on port ${port}`
+      );
     });
   } catch (error) {
-    console.log(error);
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
   }
 };
 
-(async () => {
-  await connectRedis();
-  await startServer();
-  await seedAdmin();
-})();
+// Start the server
+startServer();
 
-process.on("SIGTERM", () => {
-  console.log("SIGTERM Signal recievd... Server shutting down..");
+// --- Graceful Shutdown Logic (DRY Pattern) ---
 
-  if (server) {
-    server.close(() => {
-      process.exit(1);
-    });
-  }
-
-  process.exit(1);
-});
-process.on("SIGINT", () => {
-  console.log("Sigterm Signal recievd... Server shutting down..");
+const gracefulShutdown = (signal: string) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
 
   if (server) {
     server.close(() => {
-      process.exit(1);
+      console.log("✅ Server closed.");
+      // Disconnect DBs if needed (Good Practice)
+      mongoose.connection.close(false).then(() => {
+        console.log("✅ MongoDB connection closed.");
+        process.exit(0); // Success Exit
+      });
     });
+  } else {
+    process.exit(0);
   }
+};
 
-  process.exit(1);
-});
+// Handle Termination Signals
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
+// Handle Uncaught Errors
 process.on("unhandledRejection", (err) => {
-  console.log("Unhandled Rejection detected... Server shutting down..", err);
-
+  console.error("❌ Unhandled Rejection:", err);
+  // For unhandled rejection, we exit with error code 1
   if (server) {
     server.close(() => {
       process.exit(1);
     });
+  } else {
+    process.exit(1);
   }
-
-  process.exit(1);
 });
 
-process.on("uncaughtException", () => {
-  console.log("Uncaught Exreption detected... Server shutting down..");
-
+process.on("uncaughtException", (err) => {
+  console.error("❌ Uncaught Exception:", err);
   if (server) {
     server.close(() => {
       process.exit(1);
     });
+  } else {
+    process.exit(1);
   }
-
-  process.exit(1);
 });
