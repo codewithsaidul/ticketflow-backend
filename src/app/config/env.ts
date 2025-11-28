@@ -17,8 +17,8 @@ interface ENVCONFIG {
     JWT_REFRESH_EXPIRATION_TIME: string;
   };
 
-  ADMIN_EMAIL: string;
-  ADMIN_PASSWORD: string;
+  SUPER_ADMIN_EMAIL: string;
+  SUPER_ADMIN_PASSWORD: string;
 
   GOOGLE: {
     GOOGLE_CLIENT_ID: string;
@@ -58,8 +58,8 @@ const loadEnvVariable = (): ENVCONFIG => {
     "JWT_REFRESH_SECRET",
     "JWT_REFRESH_EXPIRATION_TIME",
 
-    "ADMIN_EMAIL",
-    "ADMIN_PASSWORD",
+    "SUPER_ADMIN_EMAIL",
+    "SUPER_ADMIN_PASSWORD",
 
     "GOOGLE_CLIENT_ID",
     "GOOGLE_CLIENT_SECRET",
@@ -92,8 +92,8 @@ const loadEnvVariable = (): ENVCONFIG => {
     FRONTEND_URL: process.env.FRONTEND_URL as string,
     LOCAL_FRONTEND_URL: process.env.LOCAL_FRONTEND_URL as string,
 
-    ADMIN_EMAIL: process.env.ADMIN_EMAIL as string,
-    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD as string,
+    SUPER_ADMIN_EMAIL: process.env.SUPER_ADMIN_EMAIL as string,
+    SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD as string,
 
     JWT: {
       JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET as string,

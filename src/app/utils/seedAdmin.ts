@@ -7,38 +7,38 @@ import { IAuthProvider, IUser, UserRole, UserStatus } from "../modules/user/user
 
 export const seedAdmin = async () => {
   try {
-    const isAdminExist = await User.findOne({ role: "admin" });
+    const isSuperAdminExist = await User.findOne({ role: UserRole.SUPERADMIN });
 
-    if (isAdminExist) {
-      console.log("Admin already exists.");
+    if (isSuperAdminExist) {
+      console.log("Super Admin already exists.");
       return null;
     }
 
     const hashPassword = await bcrypt.hash(
-      process.env.ADMIN_PASSWORD as string,
+      process.env.SUPER_ADMIN_PASSWORD as string,
       parseInt(envVars.BCRYPT_SALT_ROUND as string)
     );
 
     const authProvider: IAuthProvider = {
       provider: "credentials",
-      providerId: envVars.ADMIN_EMAIL,
+      providerId: envVars.SUPER_ADMIN_EMAIL,
     };
 
 
-    const adminInfo: IUser = {
-        name: "Admin",
-        email: envVars.ADMIN_EMAIL,
+    const superAdminInfo: IUser = {
+        name: "TicketFlow - Super Admin",
+        email: envVars.SUPER_ADMIN_EMAIL,
         password: hashPassword,
-        role: UserRole.ADMIN,
+        role: UserRole.SUPERADMIN,
         status: UserStatus.ACTIVE,
         providers: [authProvider],
         isDeleted: false,
     }
 
 
-    await User.create(adminInfo);
+    await User.create(superAdminInfo);
 
-    console.log("Admin seeded successfully.");
+    console.log("Super Admin seeded successfully.");
 
   } catch (error) {
     console.log(error);
