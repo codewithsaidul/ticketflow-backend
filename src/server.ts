@@ -14,7 +14,7 @@ const port = envVars.PORT;
 const startServer = async () => {
   try {
     // 1. Connect Databases
-    await mongoose.connect(`${envVars.DB_URL}`);
+    await mongoose.connect(`${envVars.DATABASE_URL}`);
     console.log("✅ MongoDB Connected Successfully");
 
     await connectRedis();

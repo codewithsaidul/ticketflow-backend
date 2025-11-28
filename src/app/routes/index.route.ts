@@ -4,25 +4,24 @@ import { UserRoutes } from "../modules/user/user.route";
 import { EventsRoutes } from "../modules/events/events.route";
 import { SeatRoutes } from "../modules/seat/seat.route";
 
-
 export const router = Router();
 
 const modulesRoute = [
   {
     path: "/auth",
-    route: AuthRoutes
+    route: AuthRoutes,
   },
   {
     path: "/users",
-    route: UserRoutes
+    route: UserRoutes,
   },
   {
     path: "/events",
-    route: EventsRoutes
+    route: EventsRoutes,
   },
   {
-    path: "/seat",
-    route: SeatRoutes
+    path: "/seats",
+    route: SeatRoutes,
   },
 ];
 

@@ -3,7 +3,7 @@ dotenv.config();
 
 interface ENVCONFIG {
   PORT: string;
-  DB_URL: string;
+  DATABASE_URL: string;
   NODE_ENV: "development" | "production";
   BCRYPT_SALT_ROUND: string;
   EXPRESS_SESSION_SECRET: string;
@@ -45,7 +45,7 @@ interface ENVCONFIG {
 const loadEnvVariable = (): ENVCONFIG => {
   const requiredEnvVariables: string[] = [
     "PORT",
-    "DB_URL",
+    "DATABASE_URL",
     "NODE_ENV",
     "BCRYPT_SALT_ROUND",
     "EXPRESS_SESSION_SECRET",
@@ -85,7 +85,7 @@ const loadEnvVariable = (): ENVCONFIG => {
 
   return {
     PORT: process.env.PORT as string,
-    DB_URL: process.env.DB_URL as string,
+    DATABASE_URL: process.env.DATABASE_URL as string,
     NODE_ENV: process.env.NODE_ENV as "development" | "production",
     BCRYPT_SALT_ROUND: process.env.BCRYPT_SALT_ROUND as string,
     EXPRESS_SESSION_SECRET: process.env.EXPRESS_SESSION_SECRET as string,

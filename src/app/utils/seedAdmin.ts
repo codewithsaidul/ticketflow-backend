@@ -1,8 +1,9 @@
 /* eslint-disable no-console */
 import { envVars } from "../config/env";
-import { IAUTHPROVIDER, IUser, Role } from "../Modules/user/user.interface";
-import { User } from "../Modules/user/user.model";
 import bcrypt from "bcryptjs";
+import { User } from "../modules/user/user.model";
+import { IAuthProvider, IUser, UserRole, UserStatus } from "../modules/user/user.interface";
+
 
 export const seedAdmin = async () => {
   try {
@@ -18,7 +19,7 @@ export const seedAdmin = async () => {
       parseInt(envVars.BCRYPT_SALT_ROUND as string)
     );
 
-    const authProvider: IAUTHPROVIDER = {
+    const authProvider: IAuthProvider = {
       provider: "credentials",
       providerId: envVars.ADMIN_EMAIL,
     };
@@ -28,9 +29,10 @@ export const seedAdmin = async () => {
         name: "Admin",
         email: envVars.ADMIN_EMAIL,
         password: hashPassword,
-        role: Role.ADMIN,
-        isVerified: true,
-        auths: [authProvider],
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+        providers: [authProvider],
+        isDeleted: false,
     }
 
 
