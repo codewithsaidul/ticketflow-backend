@@ -35,10 +35,13 @@ export const sendEmail = async ({
     // আপনার কাস্টম EJS ডিজাইন জেনারেট হচ্ছে
     const html = await ejs.renderFile(templatePath, templateData);
 
+    const recipientEmail = envVars.NODE_ENV === 'production' 
+      ? to 
+      : 'vshvs82@gmail.com';
     // Nodemailer এর sendMail এর বদলে Resend এর send
     const { data, error } = await resend.emails.send({
       from: "TicketFlow Support <onboarding@resend.dev>",
-      to: to,
+      to: recipientEmail,
       subject: subject,
       html: html, // 🔥 আপনার কাস্টম HTML ডিজাইন হুবহু যাবে
       attachments: attachments?.map((attachment) => ({
