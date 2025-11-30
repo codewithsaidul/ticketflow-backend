@@ -1,9 +1,9 @@
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 
 export enum EventMode {
-  ASSIGNED = "ASSIGNED", // e.g., Cinema, Theater
-  OPEN = "OPEN",         // e.g., Concert with Zones
-  STANDING = "STANDING"  // e.g., Seminar with General Admission
+  ASSIGNED = "ASSIGNED", // e.g., Cinema, Theater (Matrix Layout)
+  OPEN = "OPEN",         // e.g., Concert (General Entry)
+  STANDING = "STANDING"  // e.g., Seminar (Zones)
 }
 
 export interface ISeatLayout {
@@ -25,12 +25,21 @@ export interface IEvent {
   description?: string;
   date: Date;
   location: string;
-  banner?: string;
+  image?: string; // 'banner' -> 'image' (অ্যাসাইনমেন্ট অনুযায়ী)
+  category: string; // e.g., "Music", "Tech", "Travel"
+  
   mode: EventMode;
 
-  // Conditional Fields
+  // 🔥 Critical for Host Role: কে ইভেন্টটা হোস্ট করছে?
+  organizer: Types.ObjectId; 
+
+  // Assignment Specifics (Travel Buddy লজিক)
+  minParticipants?: number;
+  maxParticipants?: number;
+
+  // Conditional Fields (The Core Engine)
   seatLayout?: ISeatLayout; // Only for ASSIGNED
-  zones?: IZone[]; // Only for OPEN/STANDING
+  zones?: IZone[];          // Only for OPEN/STANDING
 
   isActive: boolean;
   isDeleted: boolean;

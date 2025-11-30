@@ -6,14 +6,30 @@ const eventSchema = new Schema<IEvent, EventModel>({
   description: { type: String },
   date: { type: Date, required: true },
   location: { type: String, required: true },
-  banner: { type: String },
   
+  // 🔥 Assignment Requirement: 'banner' এর বদলে 'image'
+  image: { type: String, required: true }, 
+  
+  // 🔥 Search Filter এর জন্য ক্যাটাগরি
+  category: { type: String, required: true },
+
   mode: { 
     type: String, 
-    enum: [...Object.values(EventMode)],
+    enum: Object.values(EventMode), // [...Object.values(...)] না দিলেও চলে
     default: EventMode.OPEN,
     required: true 
   },
+
+  // 🔥 CRITICAL: কে ইভেন্ট বানাচ্ছে? (Host Role)
+  organizer: { 
+    type: Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+
+  // Travel Buddy / Activity Requirements
+  minParticipants: { type: Number, default: 1 },
+  maxParticipants: { type: Number },
 
   // For Cinema/Theater (Seat Map)
   seatLayout: {
@@ -39,6 +55,12 @@ const eventSchema = new Schema<IEvent, EventModel>({
 
 // Query Middleware to hide deleted events
 eventSchema.pre('find', function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
+
+// findOne এর জন্যও ডিলিট চেক করা ভালো
+eventSchema.pre('findOne', function (next) {
   this.find({ isDeleted: { $ne: true } });
   next();
 });

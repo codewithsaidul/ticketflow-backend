@@ -24,33 +24,36 @@ const userSchema = new Schema<IUser, UserModel>(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-
-    // 🔥 পাসওয়ার্ড লজিক
-    password: {
-      type: String,
-      select: 0,
-    },
+    password: { type: String, select: 0 },
+    
+    // 🔥 New Fields for Assignment Requirements
+    phone: { type: String },
+    bio: { type: String },
+    interests: { type: [String], default: [] }, // e.g. ["Music", "Hiking"]
+    location: { type: String },
 
     providers: [authProviderSchema],
-
     profileImg: { type: String },
 
+    // 🔥 Updated Role Enum (HOST added)
     role: {
       type: String,
-      enum: [...Object.values(UserRole)],
+      enum: [...Object.values(UserRole)], // superadmin, admin, host, user
       default: UserRole.USER,
     },
     status: {
       type: String,
       enum: [...Object.values(UserStatus)],
-      default: UserStatus.ACTIVE,
+      default: UserStatus.PENDING,
     },
+    
+    isPasswordResetTokenUsed: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-// প্রি-সেভ হুক: পাসওয়ার্ড থাকলে তবেই হ্যাশ করবে
+// Pre-save hook for password hashing
 userSchema.pre("save", async function (next) {
   if (this.isModified("password") && this.password) {
     this.password = await bcrypt.hash(
@@ -61,7 +64,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// স্ট্যাটিক মেথড
+// Static methods
 userSchema.statics.isUserExistsByEmail = async function (email: string) {
   return await User.findOne({ email }).select("+password");
 };
@@ -70,7 +73,6 @@ userSchema.statics.isPasswordMatched = async function (
   plainTextPassword,
   hashedPassword
 ) {
-  // Google ইউজারদের পাসওয়ার্ড নেই, তাই চেক করার দরকার নেই
   if (!hashedPassword) return false;
   return await bcrypt.compare(plainTextPassword, hashedPassword);
 };
