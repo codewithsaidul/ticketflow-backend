@@ -1,20 +1,28 @@
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 
 export enum EventMode {
-  ASSIGNED = "ASSIGNED", // e.g., Cinema, Theater
-  OPEN = "OPEN",         // e.g., Concert with Zones
-  STANDING = "STANDING"  // e.g., Seminar with General Admission
+  ASSIGNED = "ASSIGNED",
+  OPEN = "OPEN",      
+  STANDING = "STANDING"  
+}
+
+
+export enum EventStatus {
+  ACTIVE = "active",
+  PENDING = "pending",
+  POSTPONED = "postponed",
+  CANCELLED = "cancelled"
 }
 
 export interface ISeatLayout {
   rows: number;
   cols: number;
-  matrix: number[][]; // [1,1,0,1] - 1=Seat, 0=Gap
+  matrix: number[][];
   basePrice: number;
 }
 
 export interface IZone {
-  name: string; // e.g., "VIP", "Gallery"
+  name: string; 
   capacity: number;
   price: number;
   sold: number;
@@ -23,16 +31,23 @@ export interface IZone {
 export interface IEvent {
   title: string;
   description?: string;
+  slug?: string;
   date: Date;
   location: string;
-  banner?: string;
+  image?: string;
+  category: string;
+  
   mode: EventMode;
 
-  // Conditional Fields
-  seatLayout?: ISeatLayout; // Only for ASSIGNED
-  zones?: IZone[]; // Only for OPEN/STANDING
+  organizer: Types.ObjectId; 
 
-  isActive: boolean;
+  minParticipants?: number;
+  maxParticipants?: number;
+
+  seatLayout?: ISeatLayout; 
+  zones?: IZone[]; 
+
+  status: EventStatus;
   isDeleted: boolean;
 }
 

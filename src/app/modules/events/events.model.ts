@@ -1,46 +1,64 @@
-import { Schema, model } from 'mongoose';
-import { EventMode, EventModel, IEvent } from './events.interface';
+import { Schema, model } from "mongoose";
+import { EventMode, EventModel, EventStatus, IEvent } from "./events.interface";
 
-const eventSchema = new Schema<IEvent, EventModel>({
-  title: { type: String, required: true },
-  description: { type: String },
-  date: { type: Date, required: true },
-  location: { type: String, required: true },
-  banner: { type: String },
-  
-  mode: { 
-    type: String, 
-    enum: [...Object.values(EventMode)],
-    default: EventMode.OPEN,
-    required: true 
+const eventSchema = new Schema<IEvent, EventModel>(
+  {
+    title: { type: String, required: true },
+    description: { type: String },
+    slug: { type: String },
+    date: { type: Date, required: true },
+    location: { type: String, required: true },
+    image: { type: String },
+    category: { type: String, required: true },
+    mode: {
+      type: String,
+      enum: Object.values(EventMode),
+      default: EventMode.ASSIGNED,
+      required: true,
+    },
+    organizer: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    minParticipants: { type: Number, default: 1 },
+    maxParticipants: { type: Number },
+    seatLayout: {
+      rows: { type: Number },
+      cols: { type: Number },
+      matrix: [[Number]],
+      basePrice: { type: Number },
+    },
+    zones: [
+      {
+        name: { type: String },
+        capacity: { type: Number },
+        price: { type: Number },
+        sold: { type: Number, default: 0 },
+      },
+    ],
+
+    status: {
+      type: String,
+      enum: Object.values(EventStatus),
+      default: EventStatus.ACTIVE,
+    },
+    isDeleted: { type: Boolean, default: false },
   },
+  {
+    timestamps: true,
+    versionKey: false,
+  }
+);
 
-  // For Cinema/Theater (Seat Map)
-  seatLayout: {
-    rows: { type: Number },
-    cols: { type: Number },
-    matrix: [[Number]], 
-    basePrice: { type: Number }
-  },
-
-  // For Concert/Seminar (No Seat Map)
-  zones: [{
-    name: { type: String },
-    capacity: { type: Number },
-    price: { type: Number },
-    sold: { type: Number, default: 0 }
-  }],
-
-  isActive: { type: Boolean, default: true },
-  isDeleted: { type: Boolean, default: false },
-}, {
-  timestamps: true,
-});
-
-// Query Middleware to hide deleted events
-eventSchema.pre('find', function (next) {
+eventSchema.pre("find", function (next) {
   this.find({ isDeleted: { $ne: true } });
   next();
 });
 
-export const Event = model<IEvent, EventModel>('Event', eventSchema);
+eventSchema.pre("findOne", function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
+
+export const Event = model<IEvent, EventModel>("Event", eventSchema);

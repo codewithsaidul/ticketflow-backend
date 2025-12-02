@@ -63,6 +63,22 @@ export const UserService = {
     payload: Partial<IUser>,
     currentUserRole: string
   ) => {
+    const userToUpdate = await User.findById(userId);
+
+    if (!userToUpdate) {
+      throw new AppError(StatusCodes.NOT_FOUND, "User not found");
+    }
+
+    if (
+      userToUpdate.role === UserRole.SUPERADMIN &&
+      currentUserRole !== UserRole.SUPERADMIN
+    ) {
+      throw new AppError(
+        StatusCodes.FORBIDDEN,
+        "Access Denied! Only a Super Admin can modify Super Admin accounts."
+      );
+    }
+
     if (
       currentUserRole !== UserRole.SUPERADMIN &&
       currentUserRole !== UserRole.ADMIN
@@ -70,7 +86,7 @@ export const UserService = {
       if (payload.role || payload.status || payload.email) {
         throw new AppError(
           StatusCodes.FORBIDDEN,
-          "You cannot update sensitive fields"
+          "You cannot update sensitive fields (Role, Status, Email)"
         );
       }
     }
@@ -80,21 +96,43 @@ export const UserService = {
       runValidators: true,
     });
 
-    if (!result) {
-      throw new AppError(StatusCodes.NOT_FOUND, "User not found");
-    }
-
     return result;
   },
 
-  deleteUser: async (userId: string) => {
-    const user = await User.findById(userId);
-    if (!user) {
+deleteUser: async (userId: string, currentUserRole: string) => {
+    const userToDelete = await User.findById(userId);
+
+    if (!userToDelete) {
       throw new AppError(StatusCodes.NOT_FOUND, "User not found");
     }
 
-    user.isDeleted = true;
-    await user.save();
+    if (
+      userToDelete.role === UserRole.SUPERADMIN &&
+      currentUserRole !== UserRole.SUPERADMIN
+    ) {
+      throw new AppError(
+        StatusCodes.FORBIDDEN,
+        "Access Denied! Only a Super Admin can delete another Super Admin."
+      );
+    }
+
+
+    if (userToDelete.role === UserRole.SUPERADMIN) {
+      const activeSuperAdminCount = await User.countDocuments({
+        role: UserRole.SUPERADMIN,
+        isDeleted: false,
+      });
+
+      if (activeSuperAdminCount <= 1) {
+        throw new AppError(
+          StatusCodes.CONFLICT,
+          "Operation Blocked! You cannot delete the only remaining Super Admin."
+        );
+      }
+    }
+
+    userToDelete.isDeleted = true;
+    await userToDelete.save();
 
     return null;
   },

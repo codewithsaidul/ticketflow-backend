@@ -1,14 +1,24 @@
-// seat.controller.ts
-import { Request, Response } from "express";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+import { StatusCodes } from "http-status-codes";
+import { TNext, TRequest, TResponse } from "../../types/global";
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
 import { SeatService } from "./seat.service";
 
 export const SeatController = {
-  async create(req: Request, res: Response) {
-    const data = await SeatService.create(req.body);
-    res.json(data);
-  },
-  async index(req: Request, res: Response) {
-    const list = await SeatService.findAll();
-    res.json(list);
-  },
+  getSeatsByEventId: catchAsync(
+    async (req: TRequest, res: TResponse, next: TNext) => {
+      const { eventId } = req.params;
+      const result = await SeatService.getSeatsByEventId(eventId);
+
+      sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Seats retrived successfully!",
+        data: result.data,
+        meta: result.meta,
+      });
+    }
+  ),
 };
