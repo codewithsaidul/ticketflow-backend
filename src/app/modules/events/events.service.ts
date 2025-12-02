@@ -209,6 +209,10 @@ export const EventsService = {
       }
     }
 
+    if (payload.title) {
+      payload.slug = await slugifyUnique([payload.title as string], Event, 50);
+    }
+
     const updatedEvent = await Event.findByIdAndUpdate(eventId, payload, {
       new: true,
       runValidators: true,

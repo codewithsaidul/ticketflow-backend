@@ -21,7 +21,6 @@ router.post(
   validateRequest(createUserZodSchema),
   AuthController.createUser
 );
-router.get("/verify-email", AuthController.verifyUser);
 router.post("/login", AuthController.credentialsLogin);
 router.post("/refresh-token", AuthController.getNewAccessToken);
 router.post("/logout", AuthController.logout);
@@ -40,6 +39,8 @@ router.post(
 router.post("/reset-password", AuthController.resetPassword);
 router.post("/forgot-password", AuthController.forgotPassword);
 
+
+router.get("/verify-email", AuthController.verifyUser);
 router.get("/google", async (req: TRequest, res: TResponse, next: TNext) => {
   const redirect = req.query.redirect || "/";
   passport.authenticate("google", {

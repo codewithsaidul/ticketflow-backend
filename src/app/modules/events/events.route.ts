@@ -21,12 +21,14 @@ router.get(
   checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
   EventsController.getMyAllEvents
 );
-router.get("/:slug", EventsController.getEventDetails);
 router.get(
-  "/:eventId",
+  "/dashboard/:eventId",
   checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
   EventsController.getSingleEvent
 );
+router.get("/:slug", EventsController.getEventDetails);
+
+
 router.patch(
   "/:eventId",
   checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),

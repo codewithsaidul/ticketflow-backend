@@ -6,8 +6,6 @@ import { sendResponse } from "../../utils/sendResponse";
 import { UserService } from "./user.service";
 import { JwtPayload } from "jsonwebtoken";
 
-
-
 export const UserController = {
   getAllUsers: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
@@ -81,8 +79,8 @@ export const UserController = {
 
   deleteUser: catchAsync(async (req: TRequest, res: TResponse, next: TNext) => {
     const { userId } = req.params;
-
-    await UserService.deleteUser(userId);
+    const decodedToken = req.user as JwtPayload;
+    await UserService.deleteUser(userId, decodedToken.role);
 
     sendResponse(res, {
       statusCode: StatusCodes.OK,
