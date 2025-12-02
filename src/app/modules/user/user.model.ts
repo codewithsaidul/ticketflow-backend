@@ -25,20 +25,16 @@ const userSchema = new Schema<IUser, UserModel>(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, select: 0 },
-    
-    // 🔥 New Fields for Assignment Requirements
     phone: { type: String },
     bio: { type: String },
-    interests: { type: [String], default: [] }, // e.g. ["Music", "Hiking"]
+    interests: { type: [String], default: [] },
     location: { type: String },
 
     providers: [authProviderSchema],
     profileImg: { type: String },
-
-    // 🔥 Updated Role Enum (HOST added)
     role: {
       type: String,
-      enum: [...Object.values(UserRole)], // superadmin, admin, host, user
+      enum: [...Object.values(UserRole)],
       default: UserRole.USER,
     },
     status: {
@@ -50,10 +46,10 @@ const userSchema = new Schema<IUser, UserModel>(
     isPasswordResetTokenUsed: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true, versionKey: false }
 );
 
-// Pre-save hook for password hashing
+
 userSchema.pre("save", async function (next) {
   if (this.isModified("password") && this.password) {
     this.password = await bcrypt.hash(
@@ -64,7 +60,6 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Static methods
 userSchema.statics.isUserExistsByEmail = async function (email: string) {
   return await User.findOne({ email }).select("+password");
 };

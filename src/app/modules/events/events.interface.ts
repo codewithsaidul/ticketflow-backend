@@ -1,20 +1,28 @@
 import { Model, Types } from "mongoose";
 
 export enum EventMode {
-  ASSIGNED = "ASSIGNED", // e.g., Cinema, Theater (Matrix Layout)
-  OPEN = "OPEN",         // e.g., Concert (General Entry)
-  STANDING = "STANDING"  // e.g., Seminar (Zones)
+  ASSIGNED = "ASSIGNED",
+  OPEN = "OPEN",      
+  STANDING = "STANDING"  
+}
+
+
+export enum EventStatus {
+  ACTIVE = "active",
+  PENDING = "pending",
+  POSTPONED = "postponed",
+  CANCELLED = "cancelled"
 }
 
 export interface ISeatLayout {
   rows: number;
   cols: number;
-  matrix: number[][]; // [1,1,0,1] - 1=Seat, 0=Gap
+  matrix: number[][];
   basePrice: number;
 }
 
 export interface IZone {
-  name: string; // e.g., "VIP", "Gallery"
+  name: string; 
   capacity: number;
   price: number;
   sold: number;
@@ -23,25 +31,23 @@ export interface IZone {
 export interface IEvent {
   title: string;
   description?: string;
+  slug?: string;
   date: Date;
   location: string;
-  image?: string; // 'banner' -> 'image' (অ্যাসাইনমেন্ট অনুযায়ী)
-  category: string; // e.g., "Music", "Tech", "Travel"
+  image?: string;
+  category: string;
   
   mode: EventMode;
 
-  // 🔥 Critical for Host Role: কে ইভেন্টটা হোস্ট করছে?
   organizer: Types.ObjectId; 
 
-  // Assignment Specifics (Travel Buddy লজিক)
   minParticipants?: number;
   maxParticipants?: number;
 
-  // Conditional Fields (The Core Engine)
-  seatLayout?: ISeatLayout; // Only for ASSIGNED
-  zones?: IZone[];          // Only for OPEN/STANDING
+  seatLayout?: ISeatLayout; 
+  zones?: IZone[]; 
 
-  isActive: boolean;
+  status: EventStatus;
   isDeleted: boolean;
 }
 

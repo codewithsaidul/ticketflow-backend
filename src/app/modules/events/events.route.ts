@@ -1,9 +1,43 @@
-// events.route.ts
 import { Router } from "express";
 import { EventsController } from "./events.controller";
+import { multerUpload } from "../../config/multer.config";
+import { validateRequest } from "../../middleware/validateRequest";
+import { createEventZodSchema, updateEventZodSchema } from "./event.validation";
+import { checkAuth } from "../../middleware/checkAuth";
+import { UserRole } from "../user/user.interface";
 
 const router = Router();
-router.post("/", EventsController.create);
-router.get("/", EventsController.index);
+router.post(
+  "/",
+  checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
+  multerUpload.single("file"),
+  validateRequest(createEventZodSchema),
+  EventsController.createEvent
+);
+
+router.get("/", EventsController.getAllEvents);
+router.get(
+  "/my-events",
+  checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
+  EventsController.getMyAllEvents
+);
+router.get("/:slug", EventsController.getEventDetails);
+router.get(
+  "/:eventId",
+  checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
+  EventsController.getSingleEvent
+);
+router.patch(
+  "/:eventId",
+  checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
+  multerUpload.single("file"),
+  validateRequest(updateEventZodSchema),
+  EventsController.updateEvent
+);
+router.patch(
+  "/:eventId",
+  checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
+  EventsController.deleteEvent
+);
 
 export const EventsRoutes = router;
