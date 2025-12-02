@@ -11,7 +11,6 @@ import { envVars } from "./env";
 import { User } from "../modules/user/user.model";
 import { UserRole, UserStatus } from "../modules/user/user.interface";
 
-// import { envVars } from "./env";
 
 // This configures Passport.js for user authentication using the Local Strategy.
 passport.use(
@@ -21,8 +20,10 @@ passport.use(
       passwordField: "password",
     },
     async (email: string, password: string, done: any) => {
+
       try {
-        const isUserExist = await User.findOne({ email });
+        const isUserExist = await User.findOne({ email }).select("+password");;
+
 
         if (!isUserExist) {
           return done(null, false, { message: "User not found" });

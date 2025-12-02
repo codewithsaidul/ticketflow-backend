@@ -3,6 +3,7 @@ import { Model } from "mongoose";
 export enum UserRole {
   SUPERADMIN = "superadmin",
   ADMIN = "admin",
+  HOST = "host",
   USER = "user"
 }
 
@@ -23,6 +24,9 @@ export interface IUser {
   email: string;
   password?: string;
   phone?: string;
+  bio: string;
+  interests: string[];
+  location: string;
   role?: UserRole;
   status?: UserStatus;
   

@@ -1,6 +1,10 @@
 import { Model, Types } from 'mongoose';
 
-export type TSeatStatus = 'AVAILABLE' | 'LOCKED' | 'BOOKED';
+export enum SeatStatus {
+  AVAILABLE = "available",
+  LOCKED = "locked",
+  BOOKED = "booked" 
+}
 
 export interface ISeat {
   event: Types.ObjectId; // Reference to Event
@@ -8,7 +12,7 @@ export interface ISeat {
   number: number;        // 1, 2
   label: string;         // "A1", "B5"
   price: number;
-  status: TSeatStatus;
+  status: SeatStatus;
   
   // Locking Mechanism
   lockedBy?: Types.ObjectId; // User ID

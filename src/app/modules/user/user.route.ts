@@ -7,7 +7,7 @@ import { updateUserZodSchema } from "./user.validation";
 
 const router = Router();
 
-router.get("/all-users", checkAuth(UserRole.ADMIN), UserController.getAllUsers);
+router.get("/", checkAuth(UserRole.ADMIN, UserRole.SUPERADMIN), UserController.getAllUsers);
 router.get(
   "/me",
   checkAuth(...Object.values(UserRole)),
@@ -15,7 +15,7 @@ router.get(
 );
 router.patch(
   "/:userId/userStatus",
-  checkAuth(UserRole.ADMIN),
+  checkAuth(UserRole.ADMIN, UserRole.SUPERADMIN),
   UserController.updateUserStatus
 );
 router.patch(
@@ -24,6 +24,6 @@ router.patch(
   validateRequest(updateUserZodSchema),
   UserController.updateUserInfo
 );
-router.delete("/:userId", checkAuth(UserRole.ADMIN), UserController.deleteUser);
+router.delete("/:userId", checkAuth(UserRole.ADMIN, UserRole.SUPERADMIN), UserController.deleteUser);
 
 export const UserRoutes = router;

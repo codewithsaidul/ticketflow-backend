@@ -1,9 +1,8 @@
-// seat.route.ts
 import { Router } from "express";
 import { SeatController } from "./seat.controller";
 
 const router = Router();
-router.post("/", SeatController.create);
-router.get("/", SeatController.index);
+
+router.get("/:eventId", SeatController.getSeatsByEventId);
 
 export const SeatRoutes = router;
