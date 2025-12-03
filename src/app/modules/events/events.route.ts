@@ -36,7 +36,7 @@ router.patch(
   validateRequest(updateEventZodSchema),
   EventsController.updateEvent
 );
-router.patch(
+router.delete(
   "/:eventId",
   checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
   EventsController.deleteEvent

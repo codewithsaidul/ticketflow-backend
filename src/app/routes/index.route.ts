@@ -3,6 +3,8 @@ import { AuthRoutes } from "../modules/auth/auth.route";
 import { UserRoutes } from "../modules/user/user.route";
 import { EventsRoutes } from "../modules/events/events.route";
 import { SeatRoutes } from "../modules/seat/seat.route";
+import { BookingRoutes } from "../modules/booking/booking.route";
+import { PaymentRoutes } from "../modules/payment/payment.route";
 
 export const router = Router();
 
@@ -22,6 +24,14 @@ const modulesRoute = [
   {
     path: "/seats",
     route: SeatRoutes,
+  },
+  {
+    path: "/bookings",
+    route: BookingRoutes,
+  },
+  {
+    path: "/payment",
+    route: PaymentRoutes,
   },
 ];
 
