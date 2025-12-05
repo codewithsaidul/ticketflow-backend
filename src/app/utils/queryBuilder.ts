@@ -55,12 +55,10 @@ export class QueryBuilder<T> {
   }
 
   sort(): this {
-    const sortBy = this.query.sortBy || "createdAt";
-    const sortOrder = this.query.sortOrder || "desc";
-    const sortObject: Record<string, "asc" | "desc"> = {};
-    sortObject[sortBy] = sortOrder as "asc" | "desc";
+    const sort =
+      (this.query.sort as string)?.split(",").join(" ") || "-createdAt";
 
-    this.modelQuery = this.modelQuery.sort(sortObject);
+    this.modelQuery = this.modelQuery.sort(sort as string);
 
     return this;
   }
@@ -94,9 +92,11 @@ export class QueryBuilder<T> {
   async getMeta() {
     const page = Number(this.query.page) || 1;
     const limit = Number(this.query.limit) || 10;
-    const filterDocuments = this.modelQuery.getFilter()
+    const filterDocuments = this.modelQuery.getFilter();
 
-    const totalDocuments = await this.modelQuery.model.countDocuments(filterDocuments);
+    const totalDocuments = await this.modelQuery.model.countDocuments(
+      filterDocuments
+    );
 
     return {
       page,

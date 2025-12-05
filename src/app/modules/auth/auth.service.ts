@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { StatusCodes } from "http-status-codes";
 import jwt, { JwtPayload } from "jsonwebtoken";
+import mongoose from "mongoose";
 import { envVars } from "../../config/env";
 import { AppError } from "../../errorHelpers/AppError";
 import { sendEmail } from "../../utils/sendEmail";
@@ -8,12 +9,10 @@ import {
   createAccessTokenWithRefreshToken,
   createUserToken,
 } from "../../utils/userToken";
-import { IUser, UserRole, UserStatus } from "../user/user.interface";
+import { IUser, UserStatus } from "../user/user.interface";
 import { User } from "../user/user.model";
-import mongoose from "mongoose";
 
-
-const isProd = envVars.NODE_ENV === "production";
+// const isProd = envVars.NODE_ENV === "production";
 
 export const AuthServices = {
   createUser: async (payload: Partial<IUser>) => {
@@ -31,11 +30,8 @@ export const AuthServices = {
       }
 
       const userData: Partial<IUser> = {
-        name: payload.name,
-        email: payload.email,
-        password: payload.password,
-        role: UserRole.USER,
-        status: UserStatus.PENDING,
+        ...payload,
+        status: UserStatus.ACTIVE,
         providers: [
           {
             provider: "credentials",
@@ -52,27 +48,27 @@ export const AuthServices = {
 
       const createdUser = newUser[0];
 
-      // Token Generation
-      const verificationToken = jwt.sign(
-        { email: createdUser.email, id: createdUser._id },
-        envVars.JWT.JWT_ACCESS_SECRET as string,
-        { expiresIn: "10m" }
-      );
+      // // Token Generation
+      // const verificationToken = jwt.sign(
+      //   { email: createdUser.email, id: createdUser._id },
+      //   envVars.JWT.JWT_ACCESS_SECRET as string,
+      //   { expiresIn: "10m" }
+      // );
 
-      const verificationLink = `${
-        isProd ? envVars.FRONTEND_URL : envVars.LOCAL_FRONTEND_URL
-      }/verify-email?token=${verificationToken}`;
+      // const verificationLink = `${
+      //   isProd ? envVars.FRONTEND_URL : envVars.LOCAL_FRONTEND_URL
+      // }/auth/verify-email?token=${verificationToken}`;
 
       // Email Send
-      await sendEmail({
-        to: createdUser.email,
-        subject: "Welcome to TicketFlow - Verify your email",
-        templateName: "emailVerification",
-        templateData: {
-          name: createdUser.name,
-          verificationLink,
-        },
-      });
+      // await sendEmail({
+      //   to: createdUser.email,
+      //   subject: "Welcome to TicketFlow - Verify your email",
+      //   templateName: "emailVerification",
+      //   templateData: {
+      //     name: createdUser.name,
+      //     verificationLink,
+      //   },
+      // });
 
       await session.commitTransaction();
       session.endSession();
