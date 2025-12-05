@@ -1,9 +1,15 @@
-// stats.route.ts
 import { Router } from "express";
 import { StatsController } from "./stats.controller";
+import { checkAuth } from "../../middleware/checkAuth";
+import { UserRole } from "../user/user.interface";
 
 const router = Router();
-router.post("/", StatsController.create);
-router.get("/", StatsController.index);
 
-export default router;
+
+router.get(
+  "/",
+  checkAuth(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.HOST),
+  StatsController.getStats
+);
+
+export const StatsRoutes = router;
