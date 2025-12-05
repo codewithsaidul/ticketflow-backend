@@ -246,6 +246,8 @@ export const EventsService = {
 
       await Seat.deleteMany({ event: event._id }, { session });
 
+      
+
       await Event.findByIdAndDelete(eventId, { session });
 
       await session.commitTransaction();

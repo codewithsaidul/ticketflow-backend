@@ -23,7 +23,8 @@ export const AuthController = {
     sendResponse(res, {
       statusCode: StatusCodes.CREATED,
       success: true,
-      message: `A verification email has been sent to your email. Please check your inbox to verify your account.`,
+      // message: `A verification email has been sent to your email. Please check your inbox to verify your account.`,
+      message: "Account created successfully",
       data: {
         _id: user._id,
         name: user.name,
@@ -36,7 +37,6 @@ export const AuthController = {
 
   verifyUser: catchAsync(async (req: TRequest, res: TResponse, next: TNext) => {
     const message = await AuthServices.verifyUser(req.query.token as string);
-
     sendResponse(res, {
       statusCode: StatusCodes.OK,
       success: true,

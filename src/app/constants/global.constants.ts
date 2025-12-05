@@ -2,9 +2,10 @@
 
 export const excludedFields = [
   "searchTerm",
-  "date",
-  "mode",
-  "category",
-  "minPrice",
+  "sort",
+  "limit",
+  "page",
+  "fields",
+  "minPrice", 
   "maxPrice"
 ];
