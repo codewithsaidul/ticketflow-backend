@@ -13,4 +13,29 @@ router.post(
   BookingController.createBooking
 );
 
+
+router.get(
+  "/",
+  checkAuth(UserRole.SUPERADMIN, UserRole.ADMIN), 
+  BookingController.getAllBookings
+);
+
+router.get(
+  "/host-bookings",
+  checkAuth(UserRole.HOST),
+  BookingController.getHostBookings
+);
+
+router.get(
+  "/my-bookings",
+  checkAuth(UserRole.USER),
+  BookingController.getMyBookings
+);
+
+router.get(
+  "/my-bookings",
+  checkAuth(UserRole.USER),
+  BookingController.getMyBookings
+);
+
 export const BookingRoutes = router;

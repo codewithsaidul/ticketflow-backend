@@ -12,6 +12,7 @@ import { Payment } from "../payment/payment.model";
 import { ISSLCommerz } from "../sslCommerz/sslCommerz.interface";
 import { SSLServices } from "../sslCommerz/sslCommerz.service";
 import { User } from "../user/user.model";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
 export const BookingService = {
   createBooking: async (payload: {
@@ -42,7 +43,10 @@ export const BookingService = {
       const availableSeats = await Seat.find({
         _id: { $in: uniqueSeatIds },
         event: eventId,
-        status: SeatStatus.AVAILABLE,
+        $or: [
+          { status: SeatStatus.AVAILABLE }, // সিট খালি আছে
+          { status: SeatStatus.LOCKED, lockedBy: userId }, // অথবা সিটটা এই ইউজারই লক করে রেখেছে
+        ],
       }).session(session);
 
       // checking user requested seats available or not. if not then maybe someone booked seat
@@ -91,7 +95,7 @@ export const BookingService = {
 
       const updatedBooking = await Booking.findByIdAndUpdate(
         booking[0]._id,
-        { payment: payment[0]._id, transactionId: transactionId, },
+        { payment: payment[0]._id, transactionId: transactionId },
         { new: true, runValidators: true, session }
       );
 
@@ -132,5 +136,83 @@ export const BookingService = {
       session.endSession();
       throw error;
     }
+  },
+
+  getAllBookings: async (query: Record<string, unknown>) => {
+    const queryBuilder = new QueryBuilder(Booking.find(), query);
+
+    const bookings = queryBuilder
+      .filter()
+      .sort()
+      .fields()
+      .paginate()
+      .populate("event", "title date location image seatLayout.basePrice")
+      .populate("payment", "transactionId status amount")
+      .populate("seats", "label number");
+
+    const [data, meta] = await Promise.all([
+      bookings.build(),
+      queryBuilder.getMeta(),
+    ]);
+
+    return {
+      meta,
+      data,
+    };
+  },
+
+  getHostBookings: async (hostId: string, query: Record<string, unknown>) => {
+    const hostEvents = await Event.find({ organizer: hostId }).select("_id");
+    const eventIds = hostEvents.map((event) => event._id);
+
+    const queryBuilder = new QueryBuilder(
+      Booking.find({ event: { $in: eventIds }, isDeleted: false }),
+      query
+    );
+
+    const bookings = queryBuilder
+      .filter()
+      .sort()
+      .fields()
+      .paginate()
+      .populate("event", "title date location image seatLayout.basePrice")
+      .populate("payment", "transactionId status amount")
+      .populate("seats", "label number");
+
+    const [data, meta] = await Promise.all([
+      bookings.build(),
+      queryBuilder.getMeta(),
+    ]);
+
+    return {
+      meta,
+      data,
+    };
+  },
+
+  getMyBookings: async (userId: string, query: Record<string, unknown>) => {
+    const queryBuilder = new QueryBuilder(
+      Booking.find({ user: userId, isDeleted: false }),
+      query
+    );
+
+    const bookings = queryBuilder
+      .filter()
+      .sort()
+      .fields()
+      .paginate()
+      .populate("event", "title date location image seatLayout.basePrice")
+      .populate("payment", "transactionId status amount")
+      .populate("seats", "label number");
+
+    const [data, meta] = await Promise.all([
+      bookings.build(),
+      queryBuilder.getMeta(),
+    ]);
+
+    return {
+      meta,
+      data,
+    };
   },
 };

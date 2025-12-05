@@ -99,6 +99,20 @@ export const AuthController = {
     }
   ),
 
+
+  getMe: catchAsync(async (req: TRequest, res: TResponse, next: TNext) => {
+  const { userId, role } = req.user as JwtPayload;
+
+  const result = await AuthServices.getMe(userId, role);
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "User profile retrieved successfully",
+    data: result,
+  });
+}),
+
   getNewAccessToken: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
       const refreshToken = req?.cookies?.refreshToken;
