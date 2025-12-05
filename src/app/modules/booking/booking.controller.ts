@@ -8,21 +8,65 @@ import { sendResponse } from "../../utils/sendResponse";
 import { StatusCodes } from "http-status-codes";
 
 export const BookingController = {
-  createBooking: catchAsync(async (req: TRequest, res: TResponse, next: TNext) => {
-    const { userId } = req.user as JwtPayload;
-    const payload = {
-      ...req.body,
-      userId
+  createBooking: catchAsync(
+    async (req: TRequest, res: TResponse, next: TNext) => {
+      const { userId } = req.user as JwtPayload;
+      const payload = {
+        ...req.body,
+        userId,
+      };
+
+      const result = await BookingService.createBooking(payload);
+
+      sendResponse(res, {
+        statusCode: StatusCodes.CREATED,
+        success: true,
+        message: "Your Booking created successfullt! Please make payment",
+        data: result,
+      });
     }
+  ),
 
-    const result = await BookingService.createBooking(payload);
+  getAllBookings: catchAsync(
+    async (req: TRequest, res: TResponse, next: TNext) => {
+      const result = await BookingService.getAllBookings(req.query);
 
+      sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "All bookings retrieved successfully",
+        data: result,
+      });
+    }
+  ),
 
-    sendResponse(res, {
-      statusCode: StatusCodes.CREATED,
-      success: true,
-      message: "Your Booking created successfullt! Please make payment",
-      data: result
-    })
-  })
+  getHostBookings: catchAsync(
+    async (req: TRequest, res: TResponse, next: TNext) => {
+      const { userId } = req.user as JwtPayload
+      const result = await BookingService.getHostBookings(userId, req.query);
+
+      sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Host bookings retrieved successfully",
+        data: result,
+      });
+    }
+  ),
+
+  getMyBookings: catchAsync(
+    async (req: TRequest, res: TResponse, next: TNext) => {
+      const { userId } = req.user as JwtPayload;
+
+      const result = await BookingService.getMyBookings(userId, req.query);
+
+      sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "My bookings retrieved successfully",
+        data: result.data,
+        meta: result.meta,
+      });
+    }
+  ),
 };

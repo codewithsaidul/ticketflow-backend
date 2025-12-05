@@ -142,6 +142,21 @@ export const AuthServices = {
     };
   },
 
+  getMe: async (userId: string, role: string) => {
+    // ১. ইউজারকে খুঁজে বের করা
+    const user = await User.findById(userId);
+
+    if (!user) {
+      throw new AppError(StatusCodes.NOT_FOUND, "User not found!");
+    }
+
+    if (user.role !== role) {
+      throw new AppError(StatusCodes.UNAUTHORIZED, "Role mismatch!");
+    }
+
+    return user;
+  },
+
   getNewAccessToken: async (refreshToken: string) => {
     // Logic to verify the refresh token and generate a new access token
     if (!refreshToken) {

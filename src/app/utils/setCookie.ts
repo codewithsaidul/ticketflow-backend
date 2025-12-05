@@ -11,7 +11,7 @@ export const setAuthCookie = (res: TResponse, tokenInfo: AuthToken) => {
     res.cookie("accessToken", tokenInfo.accessToken, {
       httpOnly: true, // Safer from XSS
       secure: true, // O
-      sameSite: "none",
+      sameSite: "lax",
       maxAge: 3 * 24 * 60 * 60 * 1000 // 3 days expire date
     });
   }
@@ -21,7 +21,7 @@ export const setAuthCookie = (res: TResponse, tokenInfo: AuthToken) => {
     res.cookie("refreshToken", tokenInfo.refreshToken, {
       httpOnly: true,  // Safer from XSS
       secure: true,
-      sameSite: "none",
+      sameSite: "lax",
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days expire date
     });
   }

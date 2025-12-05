@@ -6,7 +6,6 @@ import app from "./app";
 import { envVars } from "./app/config/env";
 import { seedSuperAdmin } from "./app/utils/seedSuperAdmin";
 
-
 let server: http.Server;
 export let io: SocketIoServer;
 const port = envVars.PORT;
@@ -40,6 +39,14 @@ const startServer = async () => {
         console.log(`User ${socket.id} joined room: ${ticketId}`);
       });
 
+      socket.on("client-locking-seat", (data) => {
+        // সাথে সাথে ওই ইভেন্ট রুমের সবাইকে জানিয়ে দেওয়া (ডাটাবেস আপডেট ছাড়াই)
+        socket.to(data.eventId).emit("seat-optimistic-lock", {
+          seatIds: data.seatIds,
+          lockerId: data.userId,
+        });
+      });
+
       socket.on("disconnect", () => {
         console.log(`❌ User disconnected: ${socket.id}`);
       });
@@ -57,7 +64,6 @@ const startServer = async () => {
 };
 
 startServer();
-
 
 const gracefulShutdown = (signal: string) => {
   console.log(`\n${signal} received. Shutting down gracefully...`);
