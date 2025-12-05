@@ -39,8 +39,14 @@ router.post(
 router.post("/reset-password", AuthController.resetPassword);
 router.post("/forgot-password", AuthController.forgotPassword);
 
+router.get(
+  "/me",
+  checkAuth(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.HOST, UserRole.USER),
+  AuthController.getMe
+);
 
 router.get("/verify-email", AuthController.verifyUser);
+
 router.get("/google", async (req: TRequest, res: TResponse, next: TNext) => {
   const redirect = req.query.redirect || "/";
   passport.authenticate("google", {

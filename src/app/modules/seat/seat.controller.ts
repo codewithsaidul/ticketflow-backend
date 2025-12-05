@@ -5,6 +5,7 @@ import { TNext, TRequest, TResponse } from "../../types/global";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { SeatService } from "./seat.service";
+import { JwtPayload } from "jsonwebtoken";
 
 export const SeatController = {
   getSeatsByEventId: catchAsync(
@@ -21,4 +22,17 @@ export const SeatController = {
       });
     }
   ),
+  syncSeatLocks: catchAsync(async (req: TRequest, res: TResponse) => {
+    const { seatIds, eventId } = req.body;
+    const { userId } = req.user as JwtPayload;
+
+    const result = await SeatService.syncSeatLocks(seatIds, userId, eventId);
+
+    sendResponse(res, {
+      statusCode: StatusCodes.OK,
+      success: true,
+      message: "Seat locks synced",
+      data: result,
+    });
+  }),
 };
