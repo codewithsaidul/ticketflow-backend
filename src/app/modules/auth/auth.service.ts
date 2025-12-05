@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { StatusCodes } from "http-status-codes";
 import jwt, { JwtPayload } from "jsonwebtoken";
+import mongoose from "mongoose";
 import { envVars } from "../../config/env";
 import { AppError } from "../../errorHelpers/AppError";
 import { sendEmail } from "../../utils/sendEmail";
@@ -8,10 +9,8 @@ import {
   createAccessTokenWithRefreshToken,
   createUserToken,
 } from "../../utils/userToken";
-import { IUser, UserRole, UserStatus } from "../user/user.interface";
+import { IUser, UserStatus } from "../user/user.interface";
 import { User } from "../user/user.model";
-import mongoose from "mongoose";
-
 
 const isProd = envVars.NODE_ENV === "production";
 
@@ -31,11 +30,8 @@ export const AuthServices = {
       }
 
       const userData: Partial<IUser> = {
-        name: payload.name,
-        email: payload.email,
-        password: payload.password,
-        role: UserRole.USER,
-        status: UserStatus.PENDING,
+        ...payload,
+        status: UserStatus.ACTIVE,
         providers: [
           {
             provider: "credentials",
@@ -61,7 +57,7 @@ export const AuthServices = {
 
       const verificationLink = `${
         isProd ? envVars.FRONTEND_URL : envVars.LOCAL_FRONTEND_URL
-      }/verify-email?token=${verificationToken}`;
+      }/auth/verify-email?token=${verificationToken}`;
 
       // Email Send
       await sendEmail({
