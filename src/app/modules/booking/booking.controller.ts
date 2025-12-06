@@ -49,7 +49,8 @@ export const BookingController = {
         statusCode: StatusCodes.OK,
         success: true,
         message: "Host bookings retrieved successfully",
-        data: result,
+        data: result.data,
+        meta: result.meta
       });
     }
   ),

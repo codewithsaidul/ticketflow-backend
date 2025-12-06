@@ -26,11 +26,6 @@ router.get(
   BookingController.getHostBookings
 );
 
-router.get(
-  "/my-bookings",
-  checkAuth(UserRole.USER),
-  BookingController.getMyBookings
-);
 
 router.get(
   "/my-bookings",

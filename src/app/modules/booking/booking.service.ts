@@ -165,8 +165,37 @@ export const BookingService = {
     const hostEvents = await Event.find({ organizer: hostId }).select("_id");
     const eventIds = hostEvents.map((event) => event._id);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const matchConditions: any = {
+      event: { $in: eventIds },
+      isDeleted: false,
+    };
+
+    if (query.searchTerm) {
+      const regex = new RegExp(query.searchTerm as string, "i");
+
+      const matchingEvents = await Event.find({
+        _id: { $in: eventIds },
+        title: regex,
+      }).select("_id");
+      const matchingEventIds = matchingEvents.map((e) => e._id);
+
+      const matchingUsers = await User.find({
+        name: regex,
+      }).select("_id");
+      const matchingUserIds = matchingUsers.map((u) => u._id);
+
+
+      matchConditions.$or = [
+        { event: { $in: matchingEventIds } },
+        { user: { $in: matchingUserIds } },
+      ];
+
+      delete query.searchTerm;
+    }
+
     const queryBuilder = new QueryBuilder(
-      Booking.find({ event: { $in: eventIds }, isDeleted: false }),
+      Booking.find(matchConditions),
       query
     );
 
@@ -177,7 +206,8 @@ export const BookingService = {
       .paginate()
       .populate("event", "title date location image seatLayout.basePrice")
       .populate("payment", "transactionId status amount")
-      .populate("seats", "label number");
+      .populate("seats", "label number")
+      .populate("user", "name email phone profileImg");
 
     const [data, meta] = await Promise.all([
       bookings.build(),

@@ -18,7 +18,7 @@ router.post(
 router.get("/", EventsController.getAllEvents);
 router.get(
   "/my-events",
-  checkAuth(UserRole.HOST, UserRole.ADMIN, UserRole.SUPERADMIN),
+  checkAuth(UserRole.HOST),
   EventsController.getMyAllEvents
 );
 router.get(
