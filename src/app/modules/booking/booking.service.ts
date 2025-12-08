@@ -1,4 +1,4 @@
-import { startSession } from "mongoose";
+import { startSession, Types } from "mongoose";
 import { Event } from "../events/events.model";
 import { AppError } from "../../errorHelpers/AppError";
 import { StatusCodes } from "http-status-codes";
@@ -13,6 +13,9 @@ import { ISSLCommerz } from "../sslCommerz/sslCommerz.interface";
 import { SSLServices } from "../sslCommerz/sslCommerz.service";
 import { User } from "../user/user.model";
 import { QueryBuilder } from "../../utils/queryBuilder";
+import { SeatService } from "../seat/seat.service";
+
+const BOOKING_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const BookingService = {
   createBooking: async (payload: {
@@ -36,20 +39,17 @@ export const BookingService = {
       if (!event) throw new AppError(StatusCodes.NOT_FOUND, "Event not found");
       if (!user) throw new AppError(StatusCodes.NOT_FOUND, "User not found");
 
-      // remove duplicate seat ids if have on payload
       const uniqueSeatIds = [...new Set(seatIds)];
 
-      // atomic checking: Seats are available or not
       const availableSeats = await Seat.find({
         _id: { $in: uniqueSeatIds },
         event: eventId,
         $or: [
-          { status: SeatStatus.AVAILABLE }, // সিট খালি আছে
-          { status: SeatStatus.LOCKED, lockedBy: userId }, // অথবা সিটটা এই ইউজারই লক করে রেখেছে
+          { status: SeatStatus.AVAILABLE },
+          { status: SeatStatus.LOCKED, lockedBy: userId },
         ],
       }).session(session);
 
-      // checking user requested seats available or not. if not then maybe someone booked seat
       if (availableSeats.length !== uniqueSeatIds.length) {
         throw new AppError(
           StatusCodes.CONFLICT,
@@ -57,13 +57,11 @@ export const BookingService = {
         );
       }
 
-      // calculating total price
       const totalAmount = availableSeats.reduce(
         (sum, seat) => sum + seat.price,
         0
       );
 
-      // creating a new booking (Pending State)
       const booking = await Booking.create(
         [
           {
@@ -148,7 +146,8 @@ export const BookingService = {
       .paginate()
       .populate("event", "title date location image seatLayout.basePrice")
       .populate("payment", "transactionId status amount")
-      .populate("seats", "label number");
+      .populate("seats", "label number")
+      .populate("user", "name email phone profileImg");
 
     const [data, meta] = await Promise.all([
       bookings.build(),
@@ -185,7 +184,6 @@ export const BookingService = {
       }).select("_id");
       const matchingUserIds = matchingUsers.map((u) => u._id);
 
-
       matchConditions.$or = [
         { event: { $in: matchingEventIds } },
         { user: { $in: matchingUserIds } },
@@ -194,10 +192,7 @@ export const BookingService = {
       delete query.searchTerm;
     }
 
-    const queryBuilder = new QueryBuilder(
-      Booking.find(matchConditions),
-      query
-    );
+    const queryBuilder = new QueryBuilder(Booking.find(matchConditions), query);
 
     const bookings = queryBuilder
       .filter()
@@ -244,5 +239,96 @@ export const BookingService = {
       meta,
       data,
     };
+  },
+
+  cancelUnpaidExpiredBookings: async () => {
+    const session = await Booking.startSession();
+    let releasedCount = 0;
+
+    try {
+      session.startTransaction();
+      const expirationTime = new Date(
+        new Date().getTime() - BOOKING_TIMEOUT_MS
+      );
+
+      const expiredBookings = await Booking.find({
+        status: BookingStatus.PENDING,
+        createdAt: { $lt: expirationTime },
+      })
+        .populate("seats")
+        .populate("payment") 
+        .session(session);
+
+      if (expiredBookings.length === 0) {
+        await session.commitTransaction();
+        return { releasedCount: 0 };
+      }
+
+      const bookingsByEvent = new Map<
+        string,
+        {
+          seats: Types.ObjectId[];
+          bookingIds: Types.ObjectId[];
+          paymentIds: Types.ObjectId[];
+        } 
+      >();
+
+      expiredBookings.forEach((booking) => {
+        if (!booking.payment) return;
+
+        const eventId = booking.event.toString();
+        const seats = booking.seats.map((s) => s._id);
+        const paymentId = booking.payment._id;
+
+        if (!bookingsByEvent.has(eventId)) {
+          bookingsByEvent.set(eventId, {
+            seats: [],
+            bookingIds: [],
+            paymentIds: [],
+          });
+        }
+
+        const entry = bookingsByEvent.get(eventId);
+        entry?.seats.push(...seats);
+        entry?.bookingIds.push(new Types.ObjectId(booking._id));
+        entry?.paymentIds.push(paymentId);
+        releasedCount += 1;
+      });
+
+      const allPaymentIdsToFail = Array.from(bookingsByEvent.values()).flatMap(
+        (data) => data.paymentIds
+      );
+
+      if (allPaymentIdsToFail.length > 0) {
+        await Payment.updateMany(
+          { _id: { $in: allPaymentIdsToFail } },
+          { $set: { status: PaymentStatus.FAILED } },
+          { session }
+        );
+      }
+
+      for (const [eventId, data] of bookingsByEvent.entries()) {
+        await Booking.updateMany(
+          { _id: { $in: data.bookingIds } },
+          { $set: { status: BookingStatus.EXPIRED } },
+          { session }
+        );
+
+        await SeatService.releaseSpecificLocks(
+          data.seats,
+          eventId,
+          "SYSTEM_CRON_JOB",
+          session
+        );
+      }
+
+      await session.commitTransaction();
+      return { releasedCount };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   },
 };

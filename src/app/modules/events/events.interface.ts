@@ -11,7 +11,8 @@ export enum EventStatus {
   ACTIVE = "active",
   PENDING = "pending",
   POSTPONED = "postponed",
-  CANCELLED = "cancelled"
+  CANCELLED = "cancelled",
+  FINISHED = "finished"
 }
 
 export interface ISeatLayout {
