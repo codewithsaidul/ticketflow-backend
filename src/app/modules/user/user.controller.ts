@@ -43,7 +43,7 @@ export const UserController = {
     async (req: TRequest, res: TResponse, next: TNext) => {
       const payload = req.body;
       const user = await UserService.updateUserStatus(
-        payload.userId,
+        req.params.userId,
         payload.status
       );
 

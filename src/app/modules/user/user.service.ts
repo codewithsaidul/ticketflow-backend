@@ -8,7 +8,7 @@ import { User } from "./user.model";
 export const UserService = {
   getAllUsers: async (query: Record<string, unknown>) => {
     const usersQueryBuilder = new QueryBuilder(
-      User.find({ isDeleted: false }),
+      User.find({ role: { $nin: [UserRole.ADMIN, UserRole.SUPERADMIN]}, isDeleted: false }),
       query
     )
       .search(userSearchableFields)
