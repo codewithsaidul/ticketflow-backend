@@ -42,15 +42,18 @@ export const UserController = {
   updateUserStatus: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
       const payload = req.body;
+      const { userId, role} = req.user as JwtPayload
       const user = await UserService.updateUserStatus(
         req.params.userId,
-        payload.status
+        payload.status,
+        userId,
+        role
       );
 
       sendResponse(res, {
         statusCode: StatusCodes.OK,
         success: true,
-        message: "Rider status updated successfully",
+        message: "User status updated successfully",
         data: user,
       });
     }
