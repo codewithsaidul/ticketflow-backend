@@ -17,6 +17,7 @@ import { generatePDF, IInvoice } from "../../utils/invoice";
 import { Payment } from "./payment.model";
 import { PaymentStatus } from "./payment.interface";
 
+const BOOKING_TIMEOUT_MS = 5 * 60 * 1000;
 export const PaymentServices = {
   initPayment: async (bookingId: string) => {
     const booking = await Booking.findById(bookingId).populate("user");
@@ -27,6 +28,20 @@ export const PaymentServices = {
 
     if (booking.status === BookingStatus.CONFIRMED) {
       throw new AppError(httpsStatusCode.BAD_REQUEST, "Booking already paid");
+    }
+
+    const now = new Date();
+    const createdAt = new Date(booking.createdAt as string);
+    const isExpired = now.getTime() - createdAt.getTime() > BOOKING_TIMEOUT_MS;
+
+    if (booking.status === BookingStatus.PENDING && isExpired) {
+      booking.status = BookingStatus.EXPIRED;
+      await booking.save();
+
+      throw new AppError(
+        StatusCodes.GONE, // 410 GONE indicates the resource (the lock) is no longer available
+        "Booking time limit expired. Please select seats again."
+      );
     }
 
     const user = booking.user as unknown as IUser;
@@ -54,7 +69,6 @@ export const PaymentServices = {
 
       const { transactionId } = query;
 
-      // 1. Find Booking by Transaction ID
       const booking = await Booking.findOne({ transactionId }).session(session);
 
       if (!booking) {
@@ -66,17 +80,16 @@ export const PaymentServices = {
         return { success: true, message: "Already Paid" };
       }
 
-      // 2. Update Booking Status
       const updateBooking = await Booking.findByIdAndUpdate(
         booking._id,
         {
-          status: BookingStatus.CONFIRMED, // ✅ Updated Enum
+          status: BookingStatus.CONFIRMED,
           paymentStatus: "paid",
           paidAt: new Date(),
         },
         { new: true, runValidators: true, session }
       )
-        .populate("event", "title date location") // Populating Event info
+        .populate("event", "title date location")
         .populate("user", "name email");
 
       await Payment.findByIdAndUpdate(
@@ -85,13 +98,12 @@ export const PaymentServices = {
         { runValidators: true, new: true, session }
       );
 
-      // 3. 🔥 UPDATE SEATS TO BOOKED (Critical for Ticketing)
       await Seat.updateMany(
         { _id: { $in: booking.seats } },
         {
           status: SeatStatus.BOOKED,
           paymentStatus: "paid",
-          lockExpiresAt: null, // Remove lock timer
+          lockExpiresAt: null,
         },
         { session }
       );
@@ -141,6 +153,7 @@ export const PaymentServices = {
           ],
         });
       } catch (emailError) {
+        // eslint-disable-next-line no-console
         console.error(
           "Invoice generation failed, but payment succeeded:",
           emailError

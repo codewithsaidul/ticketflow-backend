@@ -18,6 +18,7 @@ export interface IBooking {
   status: BookingStatus;
   transactionId?: string;
   isDeleted: boolean;
+  createdAt?: string;
 }
 
 export type BookingModel = Model<IBooking>;
