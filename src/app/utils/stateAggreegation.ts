@@ -42,7 +42,8 @@ export const getSalesAggregationPipeline = (filter: any = {}) => {
             $group: { 
                 _id: { $month: "$createdAt" }, 
                 totalRevenue: { $sum: "$paymentDetails.amount" }, 
-                totalTickets: { $sum: { $size: "$seats" } }
+                totalTickets: { $sum: { $size: "$seats" } },
+                totalBookings: { $sum: 1 }
             } 
         },
         { $sort: { _id: 1 as const } } 

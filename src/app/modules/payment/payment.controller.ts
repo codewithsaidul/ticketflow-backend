@@ -18,7 +18,7 @@ export const PaymentController = {
         statusCode: StatusCodes.CREATED,
         success: true,
         message: "Payment Done successfully",
-        data: result,
+        data: result.paymentUrl.GatewayPageURL,
       });
     }
   ),

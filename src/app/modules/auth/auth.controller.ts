@@ -241,7 +241,7 @@ export const AuthController = {
           envVars.NODE_ENV !== "production"
             ? envVars.LOCAL_FRONTEND_URL
             : envVars.FRONTEND_URL
-        }/${redirectTo}`
+        }/${redirectTo}?token=${tokenInfo.accessToken}`
       );
     }
   ),

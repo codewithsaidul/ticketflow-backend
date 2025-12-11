@@ -35,21 +35,23 @@ export const BookingController = {
         statusCode: StatusCodes.OK,
         success: true,
         message: "All bookings retrieved successfully",
-        data: result,
+        data: result.data,
+        meta: result.meta,
       });
     }
   ),
 
   getHostBookings: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
-      const { userId } = req.user as JwtPayload
+      const { userId } = req.user as JwtPayload;
       const result = await BookingService.getHostBookings(userId, req.query);
 
       sendResponse(res, {
         statusCode: StatusCodes.OK,
         success: true,
         message: "Host bookings retrieved successfully",
-        data: result,
+        data: result.data,
+        meta: result.meta,
       });
     }
   ),
@@ -66,6 +68,21 @@ export const BookingController = {
         message: "My bookings retrieved successfully",
         data: result.data,
         meta: result.meta,
+      });
+    }
+  ),
+
+  generateTicketDetails: catchAsync(
+    async (req: TRequest, res: TResponse, next: TNext) => {
+      const { userId } = req.user as JwtPayload;
+
+      const result = await BookingService.generateTicketDetails(req.params.bookingId, userId);
+
+      sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Bookings Details retrieved successfully",
+        data: result
       });
     }
   ),

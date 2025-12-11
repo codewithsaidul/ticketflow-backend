@@ -3,7 +3,7 @@ import { AppError } from "../../errorHelpers/AppError";
 import { Event } from "../events/events.model";
 import { EventMode } from "../events/events.interface";
 import { Seat } from "./seat.model";
-import { startSession } from "mongoose";
+import { ClientSession, startSession, Types } from "mongoose";
 import { io } from "../../../server";
 import { SeatStatus } from "./seat.interface";
 
@@ -42,7 +42,6 @@ export const SeatService = {
     try {
       session.startTransaction();
 
-      // ১. রিসেট: এই ইউজার আগে যা যা লক করেছিল, সব রিলিজ করে দাও (যাতে ডুপ্লিকেট না থাকে)
       await Seat.updateMany(
         { event: eventId, lockedBy: userId, status: SeatStatus.LOCKED },
         { status: SeatStatus.AVAILABLE, lockedBy: null, lockExpiresAt: null },
@@ -50,8 +49,6 @@ export const SeatService = {
       );
 
       if (seatIds.length > 0) {
-        // ২. নতুন সিটগুলো লক করো (Atomic Check)
-        // চেক: সিটগুলো কি আসলেই অ্যাভেইলেবল? (নাকি অন্য কেউ নিয়ে নিছে?)
         const seatsToLock = await Seat.find({
           _id: { $in: seatIds },
           event: eventId,
@@ -64,8 +61,6 @@ export const SeatService = {
             "Some selected seats are no longer available."
           );
         }
-
-        // ৩. আপডেট: সিট লক করা (৫ মিনিটের জন্য)
         await Seat.updateMany(
           { _id: { $in: seatIds } },
           {
@@ -92,6 +87,32 @@ export const SeatService = {
       throw error;
     } finally {
       session.endSession();
+    }
+  },
+
+  releaseSpecificLocks: async (
+    seatIds: Types.ObjectId[],
+    eventId: string,
+    userId: string,
+    session: ClientSession
+  ) => {
+    await Seat.updateMany(
+      { _id: { $in: seatIds }, status: SeatStatus.LOCKED },
+      {
+        $set: {
+          status: SeatStatus.AVAILABLE,
+          lockedBy: null,
+          lockExpiresAt: null,
+        },
+      },
+      { session }
+    );
+
+    if (io) {
+      io.to(eventId).emit("seats-updated", {
+        updaterId: userId,
+        releasedSeatIds: seatIds,
+      });
     }
   },
 };
