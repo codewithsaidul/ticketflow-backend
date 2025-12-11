@@ -33,4 +33,11 @@ router.get(
   BookingController.getMyBookings
 );
 
+
+router.get(
+  "/details/:bookingId",
+  checkAuth(UserRole.USER),
+  BookingController.generateTicketDetails
+);
+
 export const BookingRoutes = router;

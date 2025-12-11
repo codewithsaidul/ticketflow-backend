@@ -71,4 +71,19 @@ export const BookingController = {
       });
     }
   ),
+
+  generateTicketDetails: catchAsync(
+    async (req: TRequest, res: TResponse, next: TNext) => {
+      const { userId } = req.user as JwtPayload;
+
+      const result = await BookingService.generateTicketDetails(req.params.bookingId, userId);
+
+      sendResponse(res, {
+        statusCode: StatusCodes.OK,
+        success: true,
+        message: "Bookings Details retrieved successfully",
+        data: result
+      });
+    }
+  ),
 };

@@ -18,6 +18,8 @@ import { Payment } from "./payment.model";
 import { PaymentStatus } from "./payment.interface";
 
 const BOOKING_TIMEOUT_MS = 5 * 60 * 1000;
+
+
 export const PaymentServices = {
   initPayment: async (bookingId: string) => {
     const booking = await Booking.findById(bookingId).populate("user");

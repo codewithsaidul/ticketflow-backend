@@ -14,6 +14,7 @@ import { SSLServices } from "../sslCommerz/sslCommerz.service";
 import { User } from "../user/user.model";
 import { QueryBuilder } from "../../utils/queryBuilder";
 import { SeatService } from "../seat/seat.service";
+import qrcode from "qrcode";
 
 const BOOKING_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -241,6 +242,40 @@ export const BookingService = {
     };
   },
 
+  generateTicketDetails: async (bookingId: string, userId: string) => {
+    const booking = await Booking.findById(bookingId)
+      .populate("event", "title location date")
+      .populate("user", "name email")
+      .populate("seats", "label");
+
+    if (!booking) {
+      throw new AppError(StatusCodes.NOT_FOUND, "Ticket not found");
+    }
+
+    if (booking.user._id.toString() !== userId) {
+      throw new AppError(
+        StatusCodes.BAD_REQUEST,
+        "You can not see other booking details"
+      );
+    }
+
+    const qrPayload = JSON.stringify({
+      bookingId: bookingId,
+      scanTime: Date.now(),
+    });
+
+    const qrCodeImage = await qrcode.toDataURL(qrPayload, {
+      errorCorrectionLevel: "H",
+      type: "image/png",
+      width: 256,
+    });
+
+    return {
+      bookingDetails: booking,
+      qrCodeImage: qrCodeImage,
+    };
+  },
+
   cancelUnpaidExpiredBookings: async () => {
     const session = await Booking.startSession();
     let releasedCount = 0;
@@ -256,7 +291,7 @@ export const BookingService = {
         createdAt: { $lt: expirationTime },
       })
         .populate("seats")
-        .populate("payment") 
+        .populate("payment")
         .session(session);
 
       if (expiredBookings.length === 0) {
@@ -270,7 +305,7 @@ export const BookingService = {
           seats: Types.ObjectId[];
           bookingIds: Types.ObjectId[];
           paymentIds: Types.ObjectId[];
-        } 
+        }
       >();
 
       expiredBookings.forEach((booking) => {
