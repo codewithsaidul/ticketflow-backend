@@ -12,29 +12,14 @@ export class QueryBuilder<T> {
   }
 
   filter(): this {
-    const filter = { ...this.query };
-    for (const field of excludedFields) {
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-      delete filter[field];
+    let filter = { ...this.query };
+    const sanitizedFilter: Record<string, any> = {};
+    for (const [key, value] of Object.entries(filter)) {
+      if (excludedFields.includes(key)) continue;
+      if (value === "" || value === "undefined") continue;
+      sanitizedFilter[key] = value;
     }
-
-    // 👇 Fare Range-এর জন্য নতুন লজিক
-    const fareFilter: { $gte?: number; $lte?: number } = {};
-    if (filter.minFare) {
-      fareFilter.$gte = Number(filter.minFare);
-      delete filter.minFare; // মূল ফিল্টার থেকে মুছে দিন
-    }
-
-    if (filter.maxFare) {
-      fareFilter.$lte = Number(filter.maxFare);
-      delete filter.maxFare; // মূল ফিল্টার থেকে মুছে দিন
-    }
-
-    // যদি fareFilter-এ কোনো ডেটা থাকে, তাহলে মূল ফিল্টারে যোগ করুন
-    if (Object.keys(fareFilter).length > 0) {
-      filter.fare = fareFilter;
-    }
-    // 👆 Fare Range-এর লজিক শেষ
+    filter = sanitizedFilter;
 
     this.modelQuery = this.modelQuery.find(filter);
 

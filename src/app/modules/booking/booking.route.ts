@@ -26,16 +26,18 @@ router.get(
   BookingController.getHostBookings
 );
 
+
 router.get(
   "/my-bookings",
   checkAuth(UserRole.USER),
   BookingController.getMyBookings
 );
 
+
 router.get(
-  "/my-bookings",
+  "/details/:bookingId",
   checkAuth(UserRole.USER),
-  BookingController.getMyBookings
+  BookingController.generateTicketDetails
 );
 
 export const BookingRoutes = router;

@@ -87,7 +87,7 @@ export const EventsService = {
       .sort()
       .fields()
       .paginate()
-      .populate("organizer", "name email profileImg");
+      .populate("organizer", "name email phone profileImg");
 
     const [data, meta] = await Promise.all([
       events.build(),
@@ -171,12 +171,12 @@ export const EventsService = {
       );
     }
 
-    if (payload.mode || payload.seatLayout || payload.organizer) {
-      throw new AppError(
-        StatusCodes.BAD_REQUEST,
-        "You cannot change Seat Layout, Mode, or Organizer of an existing event"
-      );
-    }
+    // if (payload.mode || payload.seatLayout || payload.organizer) {
+    //   throw new AppError(
+    //     StatusCodes.BAD_REQUEST,
+    //     "You cannot change Seat Layout, Mode, or Organizer of an existing event"
+    //   );
+    // }
 
     if (payload.status) {
       const newStatus = payload.status;
@@ -198,6 +198,7 @@ export const EventsService = {
           EventStatus.POSTPONED,
           EventStatus.CANCELLED,
           EventStatus.PENDING,
+          EventStatus.FINISHED,
         ];
 
         if (!allowedOwnerStatuses.includes(newStatus as EventStatus)) {

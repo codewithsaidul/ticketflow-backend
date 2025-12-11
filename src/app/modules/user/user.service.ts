@@ -8,7 +8,10 @@ import { User } from "./user.model";
 export const UserService = {
   getAllUsers: async (query: Record<string, unknown>) => {
     const usersQueryBuilder = new QueryBuilder(
-      User.find({ isDeleted: false }),
+      User.find({
+        role: { $nin: [UserRole.ADMIN, UserRole.SUPERADMIN] },
+        isDeleted: false,
+      }),
       query
     )
       .search(userSearchableFields)
@@ -46,16 +49,45 @@ export const UserService = {
     return user;
   },
 
-  updateUserStatus: async (userId: string, status: UserStatus) => {
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new AppError(StatusCodes.NOT_FOUND, "User not found");
+  updateUserStatus: async (
+    targetUserId: string,
+    newStatus: UserStatus,
+    updaterId: string,
+    updaterRole: UserRole
+  ) => {
+    const targetUser = await User.findById(targetUserId);
+
+    if (!targetUser) {
+      throw new AppError(StatusCodes.NOT_FOUND, "Target user not found");
     }
 
-    user.status = status;
-    await user.save();
+    if (targetUserId === updaterId) {
+      throw new AppError(
+        StatusCodes.FORBIDDEN,
+        "You cannot modify your own status through this endpoint."
+      );
+    }
 
-    return user;
+    const targetUserRole = targetUser.role as UserRole;
+
+    if (targetUserRole === UserRole.SUPERADMIN) {
+      throw new AppError(
+        StatusCodes.FORBIDDEN,
+        "Operation forbidden. Cannot modify the status of a Super Admin."
+      );
+    }
+
+    if (targetUserRole === UserRole.ADMIN && updaterRole === UserRole.ADMIN) {
+      throw new AppError(
+        StatusCodes.FORBIDDEN,
+        "An Admin cannot modify the status of another Admin."
+      );
+    }
+
+    targetUser.status = newStatus;
+    await targetUser.save();
+
+    return targetUser;
   },
 
   updateUserInfo: async (
@@ -99,7 +131,7 @@ export const UserService = {
     return result;
   },
 
-deleteUser: async (userId: string, currentUserRole: string) => {
+  deleteUser: async (userId: string, currentUserRole: string) => {
     const userToDelete = await User.findById(userId);
 
     if (!userToDelete) {
@@ -115,7 +147,6 @@ deleteUser: async (userId: string, currentUserRole: string) => {
         "Access Denied! Only a Super Admin can delete another Super Admin."
       );
     }
-
 
     if (userToDelete.role === UserRole.SUPERADMIN) {
       const activeSuperAdminCount = await User.countDocuments({

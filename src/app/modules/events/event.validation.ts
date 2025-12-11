@@ -85,6 +85,7 @@ export const updateEventZodSchema = z.object({
   location: z.string().optional(),
   image: z.string().url().optional(),
   category: z.string().optional(),
+  status: z.string().optional(),
   minParticipants: z.number().int().min(1).optional(),
   maxParticipants: z.number().int().min(1).optional(),
   seatLayout: seatLayoutSchema.partial().optional(),
