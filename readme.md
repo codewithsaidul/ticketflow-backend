@@ -209,6 +209,20 @@ pnpm dev
 The server will be running on http://localhost:5000.
 
 
+## 🔑 Access Credentials
+
+To review the full functionality, please use the following credentials:
+~~~
+Role                         Email                                       Password
+
+Super Admin                  admin@ticketflow.com                        Ad@@1234
+
+Host                         event@gmail.com                             12345678
+
+User                         user@gmail.com                              12345678
+~~~
+
+
 ### 🧑‍💻 Author
 
 ##### SAIDUL ISLAM RANA
