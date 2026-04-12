@@ -16,9 +16,10 @@ import { IEvent } from "../events/events.interface";
 import { generatePDF, IInvoice } from "../../utils/invoice";
 import { Payment } from "./payment.model";
 import { PaymentStatus } from "./payment.interface";
+import { io } from "../../../server";
+import { redisClient } from "../../config/redis.config";
 
 const BOOKING_TIMEOUT_MS = 5 * 60 * 1000;
-
 
 export const PaymentServices = {
   initPayment: async (bookingId: string) => {
@@ -42,7 +43,7 @@ export const PaymentServices = {
 
       throw new AppError(
         StatusCodes.GONE, // 410 GONE indicates the resource (the lock) is no longer available
-        "Booking time limit expired. Please select seats again."
+        "Booking time limit expired. Please select seats again.",
       );
     }
 
@@ -89,7 +90,7 @@ export const PaymentServices = {
           paymentStatus: "paid",
           paidAt: new Date(),
         },
-        { new: true, runValidators: true, session }
+        { new: true, runValidators: true, session },
       )
         .populate("event", "title date location")
         .populate("user", "name email");
@@ -97,7 +98,7 @@ export const PaymentServices = {
       await Payment.findByIdAndUpdate(
         booking.payment,
         { status: PaymentStatus.PAID },
-        { runValidators: true, new: true, session }
+        { runValidators: true, new: true, session },
       );
 
       await Seat.updateMany(
@@ -107,8 +108,12 @@ export const PaymentServices = {
           paymentStatus: "paid",
           lockExpiresAt: null,
         },
-        { session }
+        { session },
       );
+
+      for (const seatId of booking.seats) {
+        await redisClient.del(`seat_lock:${booking.event}:${seatId}`);
+      }
 
       // ===================== Invoice Logic =====================
       try {
@@ -120,8 +125,8 @@ export const PaymentServices = {
         const invoiceData: IInvoice = {
           transactionId: transactionId,
           bookingDate: formattedDate,
-          tourTitle: eventDetails.title, // Mapped to Event Title
-          guestCount: booking.seats.length, // Mapped to Seat Count
+          tourTitle: eventDetails.title,
+          guestCount: booking.seats.length,
           totalAmount: booking.totalAmount,
           cusName: userDetails.name,
           cusEmail: userDetails.email,
@@ -134,14 +139,14 @@ export const PaymentServices = {
         const pdfBuffer = await generatePDF(invoiceData);
         const cloudinaryResult = await uploadBufferToCloudinary(
           pdfBuffer,
-          "invoice"
+          "invoice",
         );
 
         // Send Email
         await sendEmail({
           to: userDetails.email,
           subject: "Ticket Confirmation - Velotix",
-          templateName: "invoice", // Ensure you have invoice.ejs
+          templateName: "invoice",
           templateData: {
             ...invoiceData,
             downloadLink: cloudinaryResult?.secure_url,
@@ -158,13 +163,19 @@ export const PaymentServices = {
         // eslint-disable-next-line no-console
         console.error(
           "Invoice generation failed, but payment succeeded:",
-          emailError
+          emailError,
         );
-        // Don't throw error here, let the payment succeed
       }
 
       await session.commitTransaction();
       session.endSession();
+
+      if (io) {
+        io.to(booking.event.toString()).emit("seats-updated", {
+          updaterId: "SYSTEM_PAYMENT_SUCCESS",
+          releasedSeatIds: booking.seats,
+        });
+      }
 
       return { success: true, message: "Payment completed successfully" };
     } catch (error) {
@@ -192,13 +203,13 @@ export const PaymentServices = {
           status: BookingStatus.FAILED, // ✅ Updated Enum
           paymentStatus: "failed",
         },
-        { new: true, runValidators: true, session }
+        { new: true, runValidators: true, session },
       );
 
       await Payment.findByIdAndUpdate(
         booking.payment,
         { status: PaymentStatus.FAILED },
-        { runValidators: true, new: true, session }
+        { runValidators: true, new: true, session },
       );
 
       // 2. 🔥 RELEASE SEATS (Make them Available again)
@@ -209,7 +220,7 @@ export const PaymentServices = {
           lockedBy: null,
           lockExpiresAt: null,
         },
-        { session }
+        { session },
       );
 
       await session.commitTransaction();
@@ -240,13 +251,13 @@ export const PaymentServices = {
         {
           status: BookingStatus.CANCELLED,
         },
-        { new: true, runValidators: true, session }
+        { new: true, runValidators: true, session },
       );
 
       await Payment.findByIdAndUpdate(
         booking.payment,
         { status: PaymentStatus.CANCEL },
-        { runValidators: true, new: true, session }
+        { runValidators: true, new: true, session },
       );
 
       // 2. 🔥 RELEASE SEATS
@@ -257,11 +268,22 @@ export const PaymentServices = {
           lockedBy: null,
           lockExpiresAt: null,
         },
-        { session }
+        { session },
       );
+
+      for (const seatId of booking.seats) {
+        await redisClient.del(`seat_lock:${booking.event}:${seatId}`);
+      }
 
       await session.commitTransaction();
       session.endSession();
+
+      if (io) {
+        io.to(booking.event.toString()).emit("seats-updated", {
+          updaterId: "SYSTEM_PAYMENT_CANCEL",
+          releasedSeatIds: booking.seats,
+        });
+      }
 
       return { success: false, message: "Payment Cancelled" };
     } catch (error) {
@@ -272,9 +294,8 @@ export const PaymentServices = {
   },
 
   getInvoiceDownloadUrl: async (paymentId: string, userId: Types.ObjectId) => {
-    const payment = await Payment.findById(paymentId).select(
-      "invoiceUrl booking"
-    );
+    const payment =
+      await Payment.findById(paymentId).select("invoiceUrl booking");
     // .orFail(new Error("Payment not found"));
 
     const booking = await Booking.findById(payment?.booking)
@@ -288,7 +309,7 @@ export const PaymentServices = {
     if (booking.user !== userId) {
       throw new AppError(
         StatusCodes.FORBIDDEN,
-        "This invoice does not belong to you. Access denied."
+        "This invoice does not belong to you. Access denied.",
       );
     }
 

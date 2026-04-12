@@ -11,7 +11,7 @@ import { router } from "./app/routes/index.route";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { envVars } from "./app/config/env";
 import { notFound } from "./app/middleware/notFount";
-import { metricsMiddleware } from "./app/middleware/metricsMiddleware";
+// import { metricsMiddleware } from "./app/middleware/metricsMiddleware";
 import "./app/config/passport";
 import cron from "node-cron";
 import { BookingService } from "./app/modules/booking/booking.service";
@@ -56,7 +56,7 @@ app.use(passport.session());
 
 
 app.set("trust proxy", 1);
-app.use(metricsMiddleware);
+// app.use(metricsMiddleware);
 
 
 // Schedule a task to run every minute

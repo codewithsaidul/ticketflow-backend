@@ -1,11 +1,18 @@
 import { StatusCodes } from "http-status-codes";
-import { AppError } from "../../errorHelpers/AppError";
-import { Event } from "../events/events.model";
-import { EventMode } from "../events/events.interface";
-import { Seat } from "./seat.model";
-import { ClientSession, startSession, Types } from "mongoose";
+import { ClientSession, Types } from "mongoose";
 import { io } from "../../../server";
+import { redisClient } from "../../config/redis.config";
+import { AppError } from "../../errorHelpers/AppError";
+import { EventMode } from "../events/events.interface";
+import { Event } from "../events/events.model";
 import { SeatStatus } from "./seat.interface";
+import { Seat } from "./seat.model";
+
+interface ISyncSeatResult {
+  locked: string[];
+  unlocked: string[];
+  failed: string[];
+}
 
 export const SeatService = {
   getSeatsByEventId: async (eventId: string) => {
@@ -18,7 +25,7 @@ export const SeatService = {
     if (event.mode !== EventMode.ASSIGNED) {
       throw new AppError(
         StatusCodes.BAD_REQUEST,
-        "This event does not have a seat booking system"
+        "This event does not have a seat booking system",
       );
     }
 
@@ -27,8 +34,22 @@ export const SeatService = {
       number: 1,
     });
 
+    const seatsWithLocks = await Promise.all(
+      seats.map(async (seat) => {
+        const lockedBy = await redisClient.get(
+          `seat_lock:${eventId}:${seat._id}`,
+        );
+
+        return {
+          ...seat.toObject(),
+          status: lockedBy ? SeatStatus.LOCKED : seat.status,
+          lockedBy: lockedBy || null,
+        };
+      }),
+    );
+
     return {
-      data: seats,
+      data: seatsWithLocks,
       meta: {
         totalRows: event.seatLayout?.rows,
         totalCols: event.seatLayout?.cols,
@@ -38,63 +59,33 @@ export const SeatService = {
   },
 
   syncSeatLocks: async (seatIds: string[], userId: string, eventId: string) => {
-    const session = await startSession();
-    try {
-      session.startTransaction();
+    const LOCK_TTL = 300;
+    const results: ISyncSeatResult = { locked: [], unlocked: [], failed: [] };
 
-      await Seat.updateMany(
-        { event: eventId, lockedBy: userId, status: SeatStatus.LOCKED },
-        { status: SeatStatus.AVAILABLE, lockedBy: null, lockExpiresAt: null },
-        { session }
-      );
+    for (const seatId of seatIds) {
+      const lockKey = `seat_lock:${eventId}:${seatId}`;
+      const currentLockOwner = await redisClient.get(lockKey);
 
-      if (seatIds.length > 0) {
-        const seatsToLock = await Seat.find({
-          _id: { $in: seatIds },
-          event: eventId,
-          status: SeatStatus.AVAILABLE,
-        }).session(session);
-
-        if (seatsToLock.length !== seatIds.length) {
-          throw new AppError(
-            StatusCodes.CONFLICT,
-            "Some selected seats are no longer available."
-          );
-        }
-        await Seat.updateMany(
-          { _id: { $in: seatIds } },
-          {
-            status: SeatStatus.LOCKED,
-            lockedBy: userId,
-            lockExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
-          },
-          { session }
-        );
+      if (currentLockOwner === userId) {
+        await redisClient.del(lockKey);
+        results.unlocked.push(seatId);
+      } else if (!currentLockOwner) {
+        await redisClient.set(lockKey, userId, { EX: LOCK_TTL, NX: true });
+        results.locked.push(seatId);
       }
-
-      await session.commitTransaction();
-
-      if (io) {
-        io.to(eventId).emit("seats-updated", {
-          updaterId: userId,
-          lockedSeatIds: seatIds,
-        });
-      }
-
-      return "Seats synced successfully";
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
     }
+    if (io) {
+      io.to(eventId).emit("seats-updated", { updaterId: userId });
+    }
+
+    return { data: results };
   },
 
   releaseSpecificLocks: async (
     seatIds: Types.ObjectId[],
     eventId: string,
     userId: string,
-    session: ClientSession
+    session: ClientSession,
   ) => {
     await Seat.updateMany(
       { _id: { $in: seatIds }, status: SeatStatus.LOCKED },
@@ -105,13 +96,17 @@ export const SeatService = {
           lockExpiresAt: null,
         },
       },
-      { session }
+      { session },
     );
+
+    for (const id of seatIds) {
+      await redisClient.del(`seat_lock:${eventId}:${id.toString()}`);
+    }
 
     if (io) {
       io.to(eventId).emit("seats-updated", {
         updaterId: userId,
-        releasedSeatIds: seatIds,
+        releasedSeatIds: seatIds.map((id) => id.toString()),
       });
     }
   },

@@ -27,6 +27,9 @@ export const BookingService = {
     const transactionId = getTransactionId();
     const session = await startSession();
 
+    let bookingResult = null;
+    let userDetails = null;
+
     try {
       session.startTransaction();
 
@@ -54,13 +57,13 @@ export const BookingService = {
       if (availableSeats.length !== uniqueSeatIds.length) {
         throw new AppError(
           StatusCodes.CONFLICT,
-          "One or more seats are already booked or unavailable"
+          "One or more seats are already booked or unavailable",
         );
       }
 
       const totalAmount = availableSeats.reduce(
         (sum, seat) => sum + seat.price,
-        0
+        0,
       );
 
       const booking = await Booking.create(
@@ -73,7 +76,7 @@ export const BookingService = {
             status: BookingStatus.PENDING,
           },
         ],
-        { session }
+        { session },
       );
 
       if (!booking.length) {
@@ -89,13 +92,13 @@ export const BookingService = {
             status: PaymentStatus.UNPAID,
           },
         ],
-        { session }
+        { session },
       );
 
       const updatedBooking = await Booking.findByIdAndUpdate(
         booking[0]._id,
         { payment: payment[0]._id, transactionId: transactionId },
-        { new: true, runValidators: true, session }
+        { new: true, runValidators: true, session },
       );
 
       await Seat.updateMany(
@@ -109,31 +112,41 @@ export const BookingService = {
         },
         {
           session,
-        }
+        },
       );
 
-      const sslPayload: ISSLCommerz = {
-        amount: totalAmount,
-        transactionId: transactionId,
-        name: user.name,
-        email: user.email,
-        phoneNumber: user.phone || "01700000000",
-        address: user.location || "Dhaka",
-      };
-
-      const sslPayment = await SSLServices.sslPaymentInit(sslPayload);
+      bookingResult = updatedBooking;
+      userDetails = user;
 
       await session.commitTransaction();
       session.endSession();
-
-      return {
-        paymentUrl: sslPayment.GatewayPageURL,
-        booking: updatedBooking,
-      };
     } catch (error) {
       await session.abortTransaction();
       session.endSession();
       throw error;
+    }
+
+    try {
+      const sslPayload: ISSLCommerz = {
+        amount: bookingResult?.totalAmount as number,
+        transactionId: transactionId,
+        name: userDetails.name,
+        email: userDetails.email,
+        phoneNumber: userDetails.phone || "01700000000",
+        address: userDetails.location || "Dhaka",
+      };
+
+      const sslPayment = await SSLServices.sslPaymentInit(sslPayload);
+
+      return {
+        paymentUrl: sslPayment.GatewayPageURL,
+        booking: bookingResult,
+      };
+    } catch {
+      return {
+        paymentUrl: null,
+        booking: bookingResult,
+      };
     }
   },
 
@@ -219,7 +232,7 @@ export const BookingService = {
   getMyBookings: async (userId: string, query: Record<string, unknown>) => {
     const queryBuilder = new QueryBuilder(
       Booking.find({ user: userId, isDeleted: false }),
-      query
+      query,
     );
 
     const bookings = queryBuilder
@@ -244,7 +257,7 @@ export const BookingService = {
 
   generateTicketDetails: async (bookingId: string, userId: string) => {
     const booking = await Booking.findById(bookingId)
-      .populate("event", "title location date")
+      .populate("event", "title location date image")
       .populate("user", "name email")
       .populate("seats", "label");
 
@@ -255,7 +268,7 @@ export const BookingService = {
     if (booking.user._id.toString() !== userId) {
       throw new AppError(
         StatusCodes.BAD_REQUEST,
-        "You can not see other booking details"
+        "You can not see other booking details",
       );
     }
 
@@ -283,11 +296,11 @@ export const BookingService = {
     try {
       session.startTransaction();
       const expirationTime = new Date(
-        new Date().getTime() - BOOKING_TIMEOUT_MS
+        new Date().getTime() - BOOKING_TIMEOUT_MS,
       );
 
       const expiredBookings = await Booking.find({
-        status: BookingStatus.PENDING,
+        status: { $in: [BookingStatus.PENDING, BookingStatus.FAILED] },
         createdAt: { $lt: expirationTime },
       })
         .populate("seats")
@@ -331,14 +344,14 @@ export const BookingService = {
       });
 
       const allPaymentIdsToFail = Array.from(bookingsByEvent.values()).flatMap(
-        (data) => data.paymentIds
+        (data) => data.paymentIds,
       );
 
       if (allPaymentIdsToFail.length > 0) {
         await Payment.updateMany(
           { _id: { $in: allPaymentIdsToFail } },
           { $set: { status: PaymentStatus.FAILED } },
-          { session }
+          { session },
         );
       }
 
@@ -346,14 +359,14 @@ export const BookingService = {
         await Booking.updateMany(
           { _id: { $in: data.bookingIds } },
           { $set: { status: BookingStatus.EXPIRED } },
-          { session }
+          { session },
         );
 
         await SeatService.releaseSpecificLocks(
           data.seats,
           eventId,
           "SYSTEM_CRON_JOB",
-          session
+          session,
         );
       }
 

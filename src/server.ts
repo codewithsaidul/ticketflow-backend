@@ -5,6 +5,7 @@ import { Server as SocketIoServer } from "socket.io";
 import app from "./app";
 import { envVars } from "./app/config/env";
 import { seedSuperAdmin } from "./app/utils/seedSuperAdmin";
+import { connectRedis } from "./app/config/redis.config";
 
 let server: http.Server;
 export let io: SocketIoServer;
@@ -15,8 +16,8 @@ const startServer = async () => {
     await mongoose.connect(`${envVars.DATABASE_URL}`);
     console.log("✅ MongoDB Connected Successfully");
 
-    // await connectRedis();
-    // console.log("✅ Redis Connected Successfully");
+    await connectRedis();
+    console.log("✅ Redis Connected Successfully");
 
     await seedSuperAdmin();
 
@@ -29,19 +30,31 @@ const startServer = async () => {
         allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true,
       },
+      transports: ["websocket", "polling"],
     });
 
     io.on("connection", (socket) => {
       console.log(`🔌 User connected: ${socket.id}`);
+
+      socket.emit("connected", { message: `User ${socket.id} connected` });
 
       socket.on("join_ticket_room", (ticketId) => {
         socket.join(ticketId);
         console.log(`User ${socket.id} joined room: ${ticketId}`);
       });
 
+      // lock
       socket.on("client-locking-seat", (data) => {
-        // সাথে সাথে ওই ইভেন্ট রুমের সবাইকে জানিয়ে দেওয়া (ডাটাবেস আপডেট ছাড়াই)
         socket.to(data.eventId).emit("seat-optimistic-lock", {
+          seatIds: data.seatIds,
+          lockerId: data.userId,
+        });
+      });
+
+      // unlock
+      socket.on("client-unLocking-seat", (data) => {
+          console.log("🚀 ~ startServer ~ data.userId:", data.userId)
+        socket.to(data.eventId).emit("seat-optimistic-unlock", {
           seatIds: data.seatIds,
           lockerId: data.userId,
         });
@@ -54,7 +67,7 @@ const startServer = async () => {
 
     server.listen(port, () => {
       console.log(
-        `🚀 Biggest Ever Ticketing System - TicketFlow Server running on port ${port}`
+        `🚀 Biggest Ever Ticketing System - TicketFlow Server running on port ${port}`,
       );
     });
   } catch (error) {
