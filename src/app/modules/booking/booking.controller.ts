@@ -29,7 +29,7 @@ export const BookingController = {
 
   getAllBookings: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
-      const result = await BookingService.getAllBookings(req.query);
+      const result = await BookingService.getAllBookings(req.query as Record<string, string>);
 
       sendResponse(res, {
         statusCode: StatusCodes.OK,
@@ -44,7 +44,7 @@ export const BookingController = {
   getHostBookings: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
       const { userId } = req.user as JwtPayload;
-      const result = await BookingService.getHostBookings(userId, req.query);
+      const result = await BookingService.getHostBookings(userId, req.query as Record<string, string>);
 
       sendResponse(res, {
         statusCode: StatusCodes.OK,
@@ -60,7 +60,7 @@ export const BookingController = {
     async (req: TRequest, res: TResponse, next: TNext) => {
       const { userId } = req.user as JwtPayload;
 
-      const result = await BookingService.getMyBookings(userId, req.query);
+      const result = await BookingService.getMyBookings(userId, req.query as Record<string, string>);
 
       sendResponse(res, {
         statusCode: StatusCodes.OK,
