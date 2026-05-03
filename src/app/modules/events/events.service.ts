@@ -1,15 +1,13 @@
-import { startSession } from "mongoose";
-import { EventMode, EventStatus, IEvent } from "./events.interface";
-import { Event } from "./events.model";
-import { ISeat, SeatStatus } from "../seat/seat.interface";
-import { Seat } from "../seat/seat.model";
-import { QueryBuilder } from "../../utils/queryBuilder";
-import { eventSearchableFields } from "./events.constants";
-import { slugifyUnique } from "../../utils/slugify";
-import { AppError } from "../../errorHelpers/AppError";
 import { StatusCodes } from "http-status-codes";
 import { JwtPayload } from "jsonwebtoken";
+import { startSession, Types } from "mongoose";
+import { AppError } from "../../errorHelpers/AppError";
+import { slugifyUnique } from "../../utils/slugify";
+import { ISeat, SeatStatus } from "../seat/seat.interface";
 import { UserRole } from "../user/user.interface";
+import { EventMode, EventStatus, IEvent } from "./events.interface";
+import { Event } from "./events.model";
+import { EventsRepository } from "./events.repository";
 
 export const EventsService = {
   createEvent: async (payload: IEvent, userId: string) => {
@@ -21,13 +19,12 @@ export const EventsService = {
       const uniqueSlug = await slugifyUnique(
         [payload.title as string],
         Event,
-        50
+        50,
       );
-      const newEvent = await Event.create(
-        [{ ...payload, organizer: userId, slug: uniqueSlug }],
-        {
-          session,
-        }
+      const newEvent = await EventsRepository.createEvent(
+        { ...payload, organizer: new Types.ObjectId(userId), slug: uniqueSlug },
+
+        session,
       );
 
       if (!newEvent || newEvent.length === 0) {
@@ -63,7 +60,7 @@ export const EventsService = {
 
         // Here you would typically call Seat.create(seatsToCreate, { session });
         if (seatsToCreate.length > 0) {
-          await Seat.insertMany(seatsToCreate, { session });
+          await EventsRepository.createSeats(seatsToCreate, session);
         }
       }
 
@@ -79,51 +76,19 @@ export const EventsService = {
   },
 
   getAllEvents: async (query: Record<string, string>) => {
-    const queryBuilder = new QueryBuilder(Event.find(), query);
-
-    const events = queryBuilder
-      .search(eventSearchableFields)
-      .filter()
-      .sort()
-      .fields()
-      .paginate()
-      .populate("organizer", "name email phone profileImg");
-
-    const [data, meta] = await Promise.all([
-      events.build(),
-      queryBuilder.getMeta(),
-    ]);
+    const { data, meta } = await EventsRepository.getAllEvents(query);
 
     return { data, meta };
   },
 
   getMyAllEvents: async (query: Record<string, string>, userId: string) => {
-    const queryBuilder = new QueryBuilder(
-      Event.find({ organizer: userId }),
-      query
-    );
-
-    const events = queryBuilder
-      .search(eventSearchableFields)
-      .filter()
-      .sort()
-      .fields()
-      .paginate()
-      .populate("organizer", "name email profileImg");
-
-    const [data, meta] = await Promise.all([
-      events.build(),
-      queryBuilder.getMeta(),
-    ]);
+    const { data, meta } = await EventsRepository.getMyAllEvents(query, userId);
 
     return { data, meta };
   },
 
   getEventDetails: async (slug: string) => {
-    const event = await Event.findOne({ slug }).populate(
-      "organizer",
-      "name email profileImg"
-    );
+    const event = await EventsRepository.findEventBySlug(slug);
 
     if (!event) {
       throw new AppError(StatusCodes.NOT_FOUND, "This event is not found!");
@@ -133,7 +98,7 @@ export const EventsService = {
   },
 
   getSingleEvent: async (eventId: string, userId: string) => {
-    const event = await Event.findById(eventId);
+    const event = await EventsRepository.findEventById(eventId);
 
     if (!event) {
       throw new AppError(StatusCodes.NOT_FOUND, "Event not found!");
@@ -142,7 +107,7 @@ export const EventsService = {
     if (event.organizer.toString() !== userId) {
       throw new AppError(
         StatusCodes.FORBIDDEN,
-        "Your not authorized to view this event"
+        "Your not authorized to view this event",
       );
     }
 
@@ -152,7 +117,7 @@ export const EventsService = {
   updateEvent: async (
     eventId: string,
     payload: Partial<IEvent>,
-    user: JwtPayload
+    user: JwtPayload,
   ) => {
     const event = await Event.findById(eventId);
 
@@ -167,7 +132,7 @@ export const EventsService = {
     if (!isOwner && !isAdmin) {
       throw new AppError(
         StatusCodes.FORBIDDEN,
-        "You are not authorized to update this event"
+        "You are not authorized to update this event",
       );
     }
 
@@ -187,7 +152,7 @@ export const EventsService = {
         if (!allowedStatuses.includes(newStatus as EventStatus)) {
           throw new AppError(
             StatusCodes.BAD_REQUEST,
-            "Admins can only change status to ACTIVE or CANCELLED (Moderation Purpose)"
+            "Admins can only change status to ACTIVE or CANCELLED (Moderation Purpose)",
           );
         }
       }
@@ -204,7 +169,7 @@ export const EventsService = {
         if (!allowedOwnerStatuses.includes(newStatus as EventStatus)) {
           throw new AppError(
             StatusCodes.BAD_REQUEST,
-            "Invalid status update request by Host"
+            "Invalid status update request by Host",
           );
         }
       }
@@ -214,10 +179,7 @@ export const EventsService = {
       payload.slug = await slugifyUnique([payload.title as string], Event, 50);
     }
 
-    const updatedEvent = await Event.findByIdAndUpdate(eventId, payload, {
-      new: true,
-      runValidators: true,
-    });
+    const updatedEvent = await EventsRepository.updateEvent(eventId, payload);
 
     return updatedEvent;
   },
@@ -241,15 +203,12 @@ export const EventsService = {
       if (!isOwner && !isAdmin) {
         throw new AppError(
           StatusCodes.FORBIDDEN,
-          "You are not authorized to delete this event"
+          "You are not authorized to delete this event",
         );
       }
 
-      await Seat.deleteMany({ event: event._id }, { session });
-
-      
-
-      await Event.findByIdAndDelete(eventId, { session });
+      await EventsRepository.deleteSeatsByEvent(event._id.toString(), session);
+      await EventsRepository.deleteEventById(eventId, session);
 
       await session.commitTransaction();
       session.endSession();

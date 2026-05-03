@@ -7,6 +7,13 @@ export enum EventMode {
 }
 
 
+export enum GateAssignmentStrategy {
+  RANDOM = "RANDOM",
+  SEQUENTIAL = "SEQUENTIAL",      
+  MANUAL = "MANUAL"  
+}
+
+
 export enum EventStatus {
   ACTIVE = "active",
   PENDING = "pending",
@@ -27,6 +34,9 @@ export interface IZone {
   capacity: number;
   price: number;
   sold: number;
+  reserved?: number;
+  gates?: string[];
+  gateAssignmentStrategy?: GateAssignmentStrategy;
 }
 
 export interface IEvent {

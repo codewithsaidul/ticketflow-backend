@@ -1,22 +1,19 @@
-import { startSession, Types } from "mongoose";
-import { Event } from "../events/events.model";
-import { AppError } from "../../errorHelpers/AppError";
 import { StatusCodes } from "http-status-codes";
-import { Seat } from "../seat/seat.model";
-import { SeatStatus } from "../seat/seat.interface";
-import { Booking } from "./booking.model";
-import { BookingStatus } from "./booking.interface";
-import { PaymentStatus } from "../payment/payment.interface";
-import { getTransactionId } from "../../utils/getTransactionId";
-import { Payment } from "../payment/payment.model";
-import { ISSLCommerz } from "../sslCommerz/sslCommerz.interface";
-import { SSLServices } from "../sslCommerz/sslCommerz.service";
-import { User } from "../user/user.model";
-import { QueryBuilder } from "../../utils/queryBuilder";
-import { SeatService } from "../seat/seat.service";
+import { startSession, Types } from "mongoose";
 import qrcode from "qrcode";
+import { AppError } from "../../errorHelpers/AppError";
+import { getTransactionId } from "../../utils/getTransactionId";
+import { PaymentStatus } from "../payment/payment.interface";
+import { Payment } from "../payment/payment.model";
+import { SeatService } from "../seat/seat.service";
+import { ISSLCommerz } from "../sslCommerz/sslCommerz.interface";
+import { User } from "../user/user.model";
+import { BookingStatus, IBookingMatchCondition } from "./booking.interface";
+import { Booking } from "./booking.model";
+import { BookingsRepository } from "./bookings.repository";
 
 const BOOKING_TIMEOUT_MS = 5 * 60 * 1000;
+const MAX_TICKETS_PER_USER = 4;
 
 export const BookingService = {
   createBooking: async (payload: {
@@ -35,24 +32,48 @@ export const BookingService = {
 
       const { seatIds, eventId, userId } = payload;
 
-      const [event, user] = await Promise.all([
-        Event.findById(eventId).session(session),
-        User.findById(userId).session(session),
-      ]);
+      const {
+        event,
+        user,
+        booking: existingBookings,
+      } = await BookingsRepository.findEventAndUserAndBooking(
+        eventId,
+        userId,
+        session,
+      );
 
       if (!event) throw new AppError(StatusCodes.NOT_FOUND, "Event not found");
       if (!user) throw new AppError(StatusCodes.NOT_FOUND, "User not found");
 
+      const totalBookedSeatsCount = existingBookings.reduce(
+        (count, b) => count + b.seats.length,
+        0,
+      );
+
+      const remainingLimit = MAX_TICKETS_PER_USER - totalBookedSeatsCount;
+
+      if (totalBookedSeatsCount >= MAX_TICKETS_PER_USER) {
+        throw new AppError(
+          StatusCodes.BAD_REQUEST,
+          `You have already reached the maximum limit of ${MAX_TICKETS_PER_USER} tickets for this event.`,
+        );
+      }
+
       const uniqueSeatIds = [...new Set(seatIds)];
 
-      const availableSeats = await Seat.find({
-        _id: { $in: uniqueSeatIds },
-        event: eventId,
-        $or: [
-          { status: SeatStatus.AVAILABLE },
-          { status: SeatStatus.LOCKED, lockedBy: userId },
-        ],
-      }).session(session);
+      if (uniqueSeatIds.length > remainingLimit) {
+        throw new AppError(
+          StatusCodes.BAD_REQUEST,
+          `You can only book ${remainingLimit} more ticket(s) for this event.`,
+        );
+      }
+
+      const availableSeats = await BookingsRepository.availableSeats(
+        uniqueSeatIds,
+        eventId,
+        userId,
+        session,
+      );
 
       if (availableSeats.length !== uniqueSeatIds.length) {
         throw new AppError(
@@ -66,54 +87,40 @@ export const BookingService = {
         0,
       );
 
-      const booking = await Booking.create(
-        [
-          {
-            event: eventId,
-            user: userId,
-            seats: uniqueSeatIds,
-            totalAmount,
-            status: BookingStatus.PENDING,
-          },
-        ],
-        { session },
+      const booking = await BookingsRepository.createBooking(
+        {
+          event: new Types.ObjectId(eventId),
+          user: new Types.ObjectId(userId),
+          seats: uniqueSeatIds.map((id) => new Types.ObjectId(id)),
+          totalAmount,
+          status: BookingStatus.PENDING,
+        },
+
+        session,
       );
 
       if (!booking.length) {
         throw new AppError(StatusCodes.BAD_REQUEST, "Failed to create booking");
       }
 
-      const payment = await Payment.create(
-        [
-          {
-            booking: booking[0]._id,
-            transactionId: transactionId,
-            amount: totalAmount,
-            status: PaymentStatus.UNPAID,
-          },
-        ],
-        { session },
+      const payment = await BookingsRepository.createPayment(
+        {
+          booking: new Types.ObjectId(booking[0]._id),
+          transactionId: transactionId,
+          amount: totalAmount,
+          status: PaymentStatus.UNPAID,
+        },
+        session,
       );
 
-      const updatedBooking = await Booking.findByIdAndUpdate(
+      const updatedBooking = await BookingsRepository.updateBookingById(
         booking[0]._id,
-        { payment: payment[0]._id, transactionId: transactionId },
-        { new: true, runValidators: true, session },
+        payment[0]._id,
+        transactionId,
+        session,
       );
 
-      await Seat.updateMany(
-        {
-          _id: { $in: uniqueSeatIds },
-        },
-        {
-          status: SeatStatus.LOCKED,
-          lockedBy: userId,
-          lockExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
-        },
-        {
-          session,
-        },
-      );
+      await BookingsRepository.updateSeats(uniqueSeatIds, userId, session);
 
       bookingResult = updatedBooking;
       userDetails = user;
@@ -136,7 +143,7 @@ export const BookingService = {
         address: userDetails.location || "Dhaka",
       };
 
-      const sslPayment = await SSLServices.sslPaymentInit(sslPayload);
+      const sslPayment = await BookingsRepository.sslPaymentInit(sslPayload);
 
       return {
         paymentUrl: sslPayment.GatewayPageURL,
@@ -150,23 +157,8 @@ export const BookingService = {
     }
   },
 
-  getAllBookings: async (query: Record<string, unknown>) => {
-    const queryBuilder = new QueryBuilder(Booking.find(), query);
-
-    const bookings = queryBuilder
-      .filter()
-      .sort()
-      .fields()
-      .paginate()
-      .populate("event", "title date location image seatLayout.basePrice")
-      .populate("payment", "transactionId status amount")
-      .populate("seats", "label number")
-      .populate("user", "name email phone profileImg");
-
-    const [data, meta] = await Promise.all([
-      bookings.build(),
-      queryBuilder.getMeta(),
-    ]);
+  getAllBookings: async (query: Record<string, string>) => {
+    const { data, meta } = await BookingsRepository.getAllBookings(query);
 
     return {
       meta,
@@ -174,12 +166,11 @@ export const BookingService = {
     };
   },
 
-  getHostBookings: async (hostId: string, query: Record<string, unknown>) => {
-    const hostEvents = await Event.find({ organizer: hostId }).select("_id");
+  getHostBookings: async (hostId: string, query: Record<string, string>) => {
+    const hostEvents = await BookingsRepository.getHostEvents(hostId);
     const eventIds = hostEvents.map((event) => event._id);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const matchConditions: any = {
+    const matchConditions: IBookingMatchCondition = {
       event: { $in: eventIds },
       isDeleted: false,
     };
@@ -187,16 +178,17 @@ export const BookingService = {
     if (query.searchTerm) {
       const regex = new RegExp(query.searchTerm as string, "i");
 
-      const matchingEvents = await Event.find({
-        _id: { $in: eventIds },
-        title: regex,
-      }).select("_id");
+      const matchingEvents = await BookingsRepository.matchingEvents(
+        eventIds,
+        regex,
+      );
+
       const matchingEventIds = matchingEvents.map((e) => e._id);
 
       const matchingUsers = await User.find({
         name: regex,
       }).select("_id");
-      const matchingUserIds = matchingUsers.map((u) => u._id);
+      const matchingUserIds = matchingUsers.map((u) => new Types.ObjectId(u._id));
 
       matchConditions.$or = [
         { event: { $in: matchingEventIds } },
@@ -206,22 +198,7 @@ export const BookingService = {
       delete query.searchTerm;
     }
 
-    const queryBuilder = new QueryBuilder(Booking.find(matchConditions), query);
-
-    const bookings = queryBuilder
-      .filter()
-      .sort()
-      .fields()
-      .paginate()
-      .populate("event", "title date location image seatLayout.basePrice")
-      .populate("payment", "transactionId status amount")
-      .populate("seats", "label number")
-      .populate("user", "name email phone profileImg");
-
-    const [data, meta] = await Promise.all([
-      bookings.build(),
-      queryBuilder.getMeta(),
-    ]);
+    const { data, meta } = await BookingsRepository.getBookingsByHost(matchConditions, query)
 
     return {
       meta,
@@ -229,25 +206,8 @@ export const BookingService = {
     };
   },
 
-  getMyBookings: async (userId: string, query: Record<string, unknown>) => {
-    const queryBuilder = new QueryBuilder(
-      Booking.find({ user: userId, isDeleted: false }),
-      query,
-    );
-
-    const bookings = queryBuilder
-      .filter()
-      .sort()
-      .fields()
-      .paginate()
-      .populate("event", "title date location image seatLayout.basePrice")
-      .populate("payment", "transactionId status amount")
-      .populate("seats", "label number");
-
-    const [data, meta] = await Promise.all([
-      bookings.build(),
-      queryBuilder.getMeta(),
-    ]);
+  getMyBookings: async (userId: string, query: Record<string, string>) => {
+    const { data, meta } = await BookingsRepository.getMyBookings(userId, query);
 
     return {
       meta,
@@ -256,10 +216,7 @@ export const BookingService = {
   },
 
   generateTicketDetails: async (bookingId: string, userId: string) => {
-    const booking = await Booking.findById(bookingId)
-      .populate("event", "title location date image")
-      .populate("user", "name email")
-      .populate("seats", "label");
+    const booking = await BookingsRepository.findBookingById(bookingId);
 
     if (!booking) {
       throw new AppError(StatusCodes.NOT_FOUND, "Ticket not found");
@@ -299,13 +256,7 @@ export const BookingService = {
         new Date().getTime() - BOOKING_TIMEOUT_MS,
       );
 
-      const expiredBookings = await Booking.find({
-        status: { $in: [BookingStatus.PENDING, BookingStatus.FAILED] },
-        createdAt: { $lt: expirationTime },
-      })
-        .populate("seats")
-        .populate("payment")
-        .session(session);
+      const expiredBookings = await BookingsRepository.findExpiredBookings(expirationTime, session);
 
       if (expiredBookings.length === 0) {
         await session.commitTransaction();
@@ -356,11 +307,7 @@ export const BookingService = {
       }
 
       for (const [eventId, data] of bookingsByEvent.entries()) {
-        await Booking.updateMany(
-          { _id: { $in: data.bookingIds } },
-          { $set: { status: BookingStatus.EXPIRED } },
-          { session },
-        );
+        await BookingsRepository.updateManyBookings(data.bookingIds, session);
 
         await SeatService.releaseSpecificLocks(
           data.seats,

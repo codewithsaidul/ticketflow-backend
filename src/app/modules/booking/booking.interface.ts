@@ -21,4 +21,18 @@ export interface IBooking {
   createdAt?: string;
 }
 
+export interface IBookingMatchCondition {
+  $or?: {
+    event?: { $in: Types.ObjectId[] };
+    user?: { $in: Types.ObjectId[] };
+  }[];
+  event: {
+    $in: Types.ObjectId[];
+  };
+  user?: {
+    $in: Types.ObjectId[];
+  };
+  isDeleted: false;
+}
+
 export type BookingModel = Model<IBooking>;

@@ -1,5 +1,39 @@
 import { Schema, model } from "mongoose";
-import { EventMode, EventModel, EventStatus, IEvent } from "./events.interface";
+import {
+  EventMode,
+  EventModel,
+  EventStatus,
+  GateAssignmentStrategy,
+  IEvent,
+  ISeatLayout,
+  IZone,
+} from "./events.interface";
+
+const seatLayoutSchema = new Schema<ISeatLayout>(
+  {
+    rows: { type: Number },
+    cols: { type: Number },
+    matrix: [[Number]],
+    basePrice: { type: Number },
+  },
+  { _id: false, versionKey: false },
+);
+const zonesSchema = new Schema<IZone>(
+  {
+    name: { type: String },
+    capacity: { type: Number },
+    price: { type: Number },
+    sold: { type: Number, default: 0 },
+    reserved: { type: Number },
+    gates: [{ type: String }],
+    gateAssignmentStrategy: {
+      type: String,
+      enum: Object.values(GateAssignmentStrategy),
+      default: GateAssignmentStrategy.SEQUENTIAL,
+    },
+  },
+  { _id: false, versionKey: false },
+);
 
 const eventSchema = new Schema<IEvent, EventModel>(
   {
@@ -23,20 +57,8 @@ const eventSchema = new Schema<IEvent, EventModel>(
     },
     minParticipants: { type: Number, default: 1 },
     maxParticipants: { type: Number },
-    seatLayout: {
-      rows: { type: Number },
-      cols: { type: Number },
-      matrix: [[Number]],
-      basePrice: { type: Number },
-    },
-    zones: [
-      {
-        name: { type: String },
-        capacity: { type: Number },
-        price: { type: Number },
-        sold: { type: Number, default: 0 },
-      },
-    ],
+    seatLayout: seatLayoutSchema,
+    zones: [zonesSchema],
 
     status: {
       type: String,
@@ -48,7 +70,7 @@ const eventSchema = new Schema<IEvent, EventModel>(
   {
     timestamps: true,
     versionKey: false,
-  }
+  },
 );
 
 eventSchema.pre("find", function (next) {
