@@ -11,7 +11,7 @@ export const SeatController = {
   getSeatsByEventId: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
       const { eventId } = req.params;
-      const result = await SeatService.getSeatsByEventId(eventId);
+      const result = await SeatService.getSeatsByEventId(eventId as string);
 
       sendResponse(res, {
         statusCode: StatusCodes.OK,

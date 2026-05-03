@@ -44,7 +44,7 @@ export const UserController = {
       const payload = req.body;
       const { userId, role} = req.user as JwtPayload
       const user = await UserService.updateUserStatus(
-        req.params.userId,
+        req.params.userId as string,
         payload.status,
         userId,
         role
@@ -66,7 +66,7 @@ export const UserController = {
       const decodedToken = req.user as JwtPayload;
 
       const updatedUser = await UserService.updateUserInfo(
-        userId,
+        userId as string,
         payload,
         decodedToken.role
       );
@@ -83,7 +83,7 @@ export const UserController = {
   deleteUser: catchAsync(async (req: TRequest, res: TResponse, next: TNext) => {
     const { userId } = req.params;
     const decodedToken = req.user as JwtPayload;
-    await UserService.deleteUser(userId, decodedToken.role);
+    await UserService.deleteUser(userId as string, decodedToken.role);
 
     sendResponse(res, {
       statusCode: StatusCodes.OK,

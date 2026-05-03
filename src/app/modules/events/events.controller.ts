@@ -64,7 +64,7 @@ export const EventsController = {
 
   getEventDetails: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
-      const event = await EventsService.getEventDetails(req.params.slug);
+      const event = await EventsService.getEventDetails(req.params.slug as string);
 
       sendResponse(res, {
         statusCode: StatusCodes.OK,
@@ -79,7 +79,7 @@ export const EventsController = {
     async (req: TRequest, res: TResponse, next: TNext) => {
       const { userId } = req.user as JwtPayload;
       const event = await EventsService.getSingleEvent(
-        req.params.eventId,
+        req.params.eventId as string,
         userId
       );
 
@@ -100,7 +100,7 @@ export const EventsController = {
       };
 
       const event = await EventsService.updateEvent(
-        req.params.eventId,
+        req.params.eventId as string,
         payload,
         req.user as JwtPayload
       );
@@ -116,9 +116,8 @@ export const EventsController = {
 
   deleteEvent: catchAsync(
     async (req: TRequest, res: TResponse, next: TNext) => {
-      const { userId } = req.user as JwtPayload;
       await EventsService.deleteEvent(
-        req.params.eventId,
+        req.params.eventId as string,
         req.user as JwtPayload
       );
 

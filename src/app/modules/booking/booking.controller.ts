@@ -76,7 +76,7 @@ export const BookingController = {
     async (req: TRequest, res: TResponse, next: TNext) => {
       const { userId } = req.user as JwtPayload;
 
-      const result = await BookingService.generateTicketDetails(req.params.bookingId, userId);
+      const result = await BookingService.generateTicketDetails(req.params.bookingId as string, userId);
 
       sendResponse(res, {
         statusCode: StatusCodes.OK,

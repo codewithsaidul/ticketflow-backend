@@ -12,7 +12,7 @@ export const PaymentController = {
     async (req: Request, res: Response, next: NextFunction) => {
       const bookingId = req.params.bookingId;
 
-      const result = await PaymentServices.initPayment(bookingId);
+      const result = await PaymentServices.initPayment(bookingId as string);
 
       sendResponse(res, {
         statusCode: StatusCodes.CREATED,
@@ -73,7 +73,7 @@ export const PaymentController = {
       const { paymentId } = req.params;
       const decodedToken = req.user as JwtPayload;
       const result = await PaymentServices.getInvoiceDownloadUrl(
-        paymentId,
+        paymentId as string,
         decodedToken._id
       );
       sendResponse(res, {
